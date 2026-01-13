@@ -1,42 +1,42 @@
-import { useEffect, useState } from "react";
+import React from "react";
+import dynamic from "next/dynamic";
 
-export default function Home() {
-  const [user, setUser] = useState(null);
-  const [isTelegram, setIsTelegram] = useState(false);
+function Home() {
+  return <TelegramApp />;
+}
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+function TelegramApp() {
+  const [mounted, setMounted] = React.useState(false);
+  const [user, setUser] = React.useState(null);
+
+  React.useEffect(() => {
+    setMounted(true);
 
     if (window.Telegram && window.Telegram.WebApp) {
       const tg = window.Telegram.WebApp;
+      tg.ready();
 
-      tg.ready(); // tell Telegram the app is ready
-      setIsTelegram(true);
-
-      const telegramUser = tg.initDataUnsafe?.user;
-      if (telegramUser) {
-        setUser(telegramUser);
-      }
+      setUser(tg.initDataUnsafe?.user || null);
     }
   }, []);
+
+  if (!mounted) {
+    return <p style={{ padding: 20 }}>Loading...</p>;
+  }
 
   return (
     <main style={{ padding: 20 }}>
       <h1>⚡ Swift Wallet</h1>
 
-      {!isTelegram && (
-        <p style={{ color: "red" }}>
-          Open this app inside Telegram
-        </p>
-      )}
-
-      {user && (
-        <div>
-          <p>Welcome, {user.first_name} 👋</p>
-          <p>Username: @{user.username}</p>
-          <p>User ID: {user.id}</p>
-        </div>
+      {user ? (
+        <p>Welcome, {user.first_name} 👋</p>
+      ) : (
+        <p>Opened inside Telegram, but no user data</p>
       )}
     </main>
   );
-  }
+}
+
+export default dynamic(() => Promise.resolve(Home), {
+  ssr: false,
+});
