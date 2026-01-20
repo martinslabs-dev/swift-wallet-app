@@ -20,28 +20,27 @@ module.exports = {
       },
       animation: {
         'cosmic-bg': 'cosmic-bg 25s ease infinite',
-        'aurora': 'aurora 15s ease infinite',
         'pulse-glow': 'pulse-glow 3s infinite',
-        'gradient-flow': 'gradient-flow 4s linear infinite',
+        'fade-in-out': 'fade-in-out 5s ease-in-out infinite',
+        'fly-in': 'fly-in 1.5s ease-out forwards',
       },
       keyframes: {
         'cosmic-bg': {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' },
         },
-        'aurora': {
-            '0%, 100%': { backgroundPosition: '0% 50%' },
-            '50%': { backgroundPosition: '100% 50%' },
-        },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 20px #00FFFF' },
-          '50%': { boxShadow: '0 0 35px #FF00FF' },
+          '0%, 100%': { boxShadow: '0 0 20px #00FFFF', transform: 'scale(1)' },
+          '50%': { boxShadow: '0 0 35px #FF00FF', transform: 'scale(1.05)' },
         },
-        'gradient-flow': {
-          '0%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-          '100%': { backgroundPosition: '0% 50%' },
-        }
+        'fade-in-out': {
+            '0%, 100%': { opacity: 0, transform: 'translateY(10px)' },
+            '20%, 80%': { opacity: 1, transform: 'translateY(0px)' },
+        },
+        'fly-in': {
+            '0%': { transform: 'translateY(-50px) scale(0.8)', opacity: 0 },
+            '100%': { transform: 'translateY(0) scale(1)', opacity: 1 },
+        },
       },
     },
   },
