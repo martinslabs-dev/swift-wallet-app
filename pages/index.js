@@ -1,213 +1,114 @@
 import React from "react";
 import dynamic from "next/dynamic";
-import { ethers } from "ethers";
 
-const MAX_WALLETS = 5;
-const STORAGE_KEY = "swift_wallets";
+// A more fitting icon for the new theme
+const SwapIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={2}
+    stroke="#E5E7EB" // A light gray, not pure white
+    className="w-8 h-8"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18M16.5 3L21 7.5m0 0L16.5 12M21 7.5H3"
+    />
+  </svg>
+);
 
-function TelegramApp() {
-  const [step, setStep] = React.useState("start"); 
-  // start | show-seed | confirm | wallet
-
-  const [mnemonic, setMnemonic] = React.useState(null);
-
-  const [wallets, setWallets] = React.useState([]);
-  const [activeWalletId, setActiveWalletId] = React.useState(null);
-
-  const [pendingWallet, setPendingWallet] = React.useState(null);
+function CosmicBridgeApp() {
   const [mounted, setMounted] = React.useState(false);
+  const [isFromActive, setFromActive] = React.useState(false);
+  const [isToActive, setToActive] = React.useState(false);
 
-  // ---------- INIT ----------
   React.useEffect(() => {
     setMounted(true);
-
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
-    }
-
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setWallets(parsed.wallets || []);
-      setActiveWalletId(parsed.activeWalletId || null);
-      if (parsed.wallets?.length > 0) {
-        setStep("wallet");
-      }
+      window.Telegram.WebApp.expand();
+      // Set the background color of the Telegram app to match our theme
+      window.Telegram.WebApp.setHeaderColor('#0B0F1A');
+      window.Telegram.WebApp.setBackgroundColor('#0B0F1A');
     }
   }, []);
 
   if (!mounted) {
-    return <p style={{ padding: 20 }}>Loading...</p>;
+    return <div className="cosmic-background w-full h-screen"></div>; // Show background during SSR
   }
 
-  // ---------- HELPERS ----------
-  function generateSeed() {
-    const w = ethers.Wallet.createRandom();
-    return {
-      id: `wallet-${Date.now()}`,
-      address: w.address,
-      privateKey: w.privateKey,
-      mnemonic: w.mnemonic.phrase,
-    };
-  }
-
-  function saveWallets(updatedWallets, newActiveId) {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        wallets: updatedWallets,
-        activeWalletId: newActiveId,
-      })
-    );
-  }
-
-  function getActiveWallet() {
-    return wallets.find(w => w.id === activeWalletId);
-  }
-
-  const activeWallet = getActiveWallet();
-
-  // ---------- UI ----------
   return (
-    <main style={{ padding: 20 }}>
-      {/* STEP 1: START */}
-      {step === "start" && (
-        <>
-          <h1>⚡ Swift Wallet</h1>
-          <p>Create a new wallet</p>
+    <div className="cosmic-background min-h-screen p-4 flex flex-col justify-center items-center font-sans">
+      <main className="w-full max-w-md mx-auto">
+        {/* Header - Minimalist approach */}
+        <header className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-white tracking-wider">COSMIC BRIDGE</h1>
+          <p className="text-light-cyan/80 text-sm">The seamless path between blockchains</p>
+        </header>
 
-          {wallets.length >= MAX_WALLETS && (
-            <p style={{ color: "red" }}>
-              Maximum of {MAX_WALLETS} wallets reached
-            </p>
-          )}
-
-          <button
-            disabled={wallets.length >= MAX_WALLETS}
-            onClick={() => {
-              const w = generateSeed();
-              setPendingWallet(w);
-              setMnemonic(w.mnemonic);
-              setStep("show-seed");
-            }}
-          >
-            Create Wallet
-          </button>
-        </>
-      )}
-
-      {/* STEP 2: SHOW SEED */}
-      {step === "show-seed" && (
-        <>
-          <h2>Write down your recovery phrase</h2>
-
-          <div style={{ background: "#111", padding: 12 }}>
-            {mnemonic}
+        <div className="relative flex flex-col items-center justify-center space-y-2">
+          {/* From Card */}
+          <div className={`glass-card w-full p-4 ${isFromActive ? 'active' : ''}`}>
+              <div className="flex justify-between text-gray-300 text-sm mb-2">
+                  <span>From</span>
+              </div>
+              <div className="flex justify-between items-center">
+                  <input
+                      type="number"
+                      placeholder="0.0"
+                      className="bg-transparent text-white text-4xl font-light focus:outline-none w-1/2"
+                      onFocus={() => { setFromActive(true); setToActive(false); }}
+                  />
+                  <button className="bg-gray-800/50 hover:bg-gray-700/70 border border-glass-border text-white px-5 py-3 rounded-xl flex items-center space-x-3 transition-colors">
+                      <div className="w-8 h-8 bg-blue-500 rounded-full"></div> {/* Placeholder */}
+                      <span className="font-bold text-lg">ETH</span>
+                      <span>&gt;</span>
+                  </button>
+              </div>
+              <div className="text-gray-400 text-sm mt-1">$0.00</div>
           </div>
 
-          <p style={{ color: "red" }}>
-            Never share this phrase with anyone.
-          </p>
+          {/* Swap Orb */}
+          <div className="swap-orb z-10">
+            <SwapIcon />
+          </div>
 
-          <button onClick={() => setStep("confirm")}>
-            I have written it down
+          {/* To Card */}
+          <div className={`glass-card w-full p-4 ${isToActive ? 'active' : ''}`}>
+              <div className="flex justify-between text-gray-300 text-sm mb-2">
+                  <span>To</span>
+              </div>
+              <div className="flex justify-between items-center">
+                  <input
+                      type="text"
+                      placeholder="0.0"
+                      className="bg-transparent text-white text-4xl font-light focus:outline-none w-1/2 cursor-default"
+                      readOnly
+                  />
+                  <button 
+                    onClick={() => { setToActive(true); setFromActive(false); }}
+                    className="bg-energy-gradient text-black px-5 py-3 rounded-xl font-bold text-lg flex items-center space-x-2 transition-transform hover:scale-105">
+                      <span>SELECT TOKEN</span>
+                      <span>&gt;</span>
+                  </button>
+              </div>
+              <div className="text-gray-400 text-sm mt-1">$0.00</div>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <div className="mt-8">
+          <button className="w-full bg-energy-gradient text-black py-4 rounded-xl font-bold text-xl tracking-wider transition-transform hover:scale-105 animate-pulse-glow">
+            CONNECT WALLET
           </button>
-        </>
-      )}
-
-      {/* STEP 3: CONFIRM */}
-      {step === "confirm" && (
-        <>
-          <h2>Confirm</h2>
-          <p>
-            If you lose your recovery phrase, you lose access to your wallet.
-          </p>
-
-          <button
-            onClick={() => {
-              const updatedWallets = [...wallets, pendingWallet];
-              setWallets(updatedWallets);
-              setActiveWalletId(pendingWallet.id);
-              saveWallets(updatedWallets, pendingWallet.id);
-
-              setPendingWallet(null);
-              setMnemonic(null);
-              setStep("wallet");
-            }}
-          >
-            Continue
-          </button>
-        </>
-      )}
-
-      {/* STEP 4: WALLET HOME */}
-      {step === "wallet" && activeWallet && (
-        <>
-          <h2>Your Wallet</h2>
-
-          <p><strong>Active Address:</strong></p>
-          <p>{activeWallet.address}</p>
-
-          <h3 style={{ marginTop: 20 }}>Your Wallets</h3>
-
-          {wallets.map(w => (
-            <div
-              key={w.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-                background: "#111",
-                padding: 8,
-              }}
-            >
-              <span
-                style={{ cursor: "pointer" }}
-                onClick={() => {
-                  setActiveWalletId(w.id);
-                  saveWallets(wallets, w.id);
-                }}
-              >
-                {w.address.slice(0, 6)}...{w.address.slice(-4)}
-              </span>
-
-              <button
-                style={{ color: "red" }}
-                onClick={() => {
-                  const updated = wallets.filter(x => x.id !== w.id);
-                  const newActive =
-                    w.id === activeWalletId
-                      ? updated[0]?.id || null
-                      : activeWalletId;
-
-                  setWallets(updated);
-                  setActiveWalletId(newActive);
-                  saveWallets(updated, newActive);
-
-                  if (updated.length === 0) {
-                    setStep("start");
-                  }
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-
-          {wallets.length < MAX_WALLETS && (
-            <button
-              style={{ marginTop: 20 }}
-              onClick={() => setStep("start")}
-            >
-              Create Another Wallet
-            </button>
-          )}
-        </>
-      )}
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }
 
-export default dynamic(() => Promise.resolve(TelegramApp), {
+export default dynamic(() => Promise.resolve(CosmicBridgeApp), {
   ssr: false,
 });
