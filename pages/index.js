@@ -36,7 +36,7 @@ function GatewayScreen() {
           <button className="w-full bg-energy-gradient text-black py-4 rounded-xl font-bold text-xl tracking-wider transition-transform hover:scale-105 animate-pulse-glow shadow-lg shadow-cyan-500/20">
             Create New Wallet
           </button>
-          <button className="w-full bg-glass-white/80 border border-glass-border text-white py-3.5 rounded-xl font-semibold text-lg hover:bg-glass-white transition-colors duration-300">
+          <button className="w-full bg-glass-white/80 border border-glass-border text-black py-3.5 rounded-xl font-semibold text-lg hover:bg-glass-white transition-colors duration-300">
             Import Existing Wallet
           </button>
         </div>
