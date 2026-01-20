@@ -10,9 +10,7 @@
 
 @layer components {
   .cosmic-background {
-    background: linear-gradient(45deg, #0B0F1A, #191326, #0B0F1A);
-    background-size: 200% 200%;
-    animation: cosmic-bg 25s ease infinite;
+    background-color: #1A1B1E;
   }
 
   .glass-card {
