@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import NumberKeyboard from './NumberKeyboard';
 
-const ConfirmPasscode = ({ originalPasscode, onPasscodeConfirmed }) => {
+const ConfirmPasscode = ({ originalPasscode, onPasscodeConfirmed, onBack }) => {
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState('');
 
@@ -70,7 +70,7 @@ const ConfirmPasscode = ({ originalPasscode, onPasscodeConfirmed }) => {
         </div>
 
         <div className="w-full pb-8">
-            <NumberKeyboard onKeyPress={handleKeyPress} onBackspace={handleBackspace} />
+            <NumberKeyboard onKeyPress={handleKeyPress} onBackspace={handleBackspace} onBack={onBack} />
         </div>
 
         {/* Add a simple shake animation to globals.css */}

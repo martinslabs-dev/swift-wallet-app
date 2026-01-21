@@ -1,17 +1,29 @@
-
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import OnboardingCarousel from "../components/OnboardingCarousel";
 import CreatePasscode from "../components/auth/CreatePasscode";
 import ConfirmPasscode from "../components/auth/ConfirmPasscode";
+import EnableBiometrics from "../components/auth/EnableBiometrics";
+import UnlockScreen from "../components/auth/UnlockScreen";
+import { storage } from "../utils/storage";
+import { webauthn } from "../utils/webauthn";
 
 function GatewayScreen() {
   const [mounted, setMounted] = useState(false);
   const [walletCreationStep, setWalletCreationStep] = useState(null);
   const [passcode, setPasscode] = useState("");
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [unlockError, setUnlockError] = useState("");
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [hasBiometrics, setHasBiometrics] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    const onboardingStatus = storage.hasCompletedOnboarding();
+    setHasCompletedOnboarding(onboardingStatus);
+    const biometricsStatus = !!storage.getWebAuthnCredentialId();
+    setHasBiometrics(biometricsStatus);
+
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
@@ -21,7 +33,7 @@ function GatewayScreen() {
   }, []);
 
   if (!mounted) {
-    return <div className="cosmic-background w-full h-screen" />; // Render background for smooth transition
+    return <div className="cosmic-background w-full h-screen" />;
   }
 
   const handleCreateWalletClick = () => {
@@ -33,19 +45,70 @@ function GatewayScreen() {
     setWalletCreationStep('confirmPasscode');
   };
 
-  const handlePasscodeConfirmed = () => {
-    // For now, just log it. In Phase 2, we'll navigate to the biometrics step.
-    console.log("Wallet creation complete! Passcode:", passcode);
-    // Reset the flow for now
-    setWalletCreationStep(null);
+  const handlePasscodeConfirmed = async () => {
+    const walletData = { privateKey: "super-secret-private-key" }; // Mock wallet data
+    await storage.saveEncryptedWallet(walletData, passcode);
+    setWalletCreationStep('enableBiometrics');
+  };
+
+  const handleBiometricsEnabled = async () => {
+    try {
+        const credentialId = await webauthn.register();
+        storage.setWebAuthnCredentialId(credentialId);
+        storage.setHasCompletedOnboarding();
+        setIsUnlocked(true); // Go to main app
+    } catch (err) {
+        console.error("Biometric registration failed", err);
+        // If it fails, we still complete onboarding, just without biometrics
+        handleSkipBiometrics();
+    }
+  };
+
+  const handleSkipBiometrics = () => {
+    storage.setHasCompletedOnboarding();
+    setIsUnlocked(true); // Go to main app
+  };
+
+  const handleBack = () => {
+    setWalletCreationStep('createPasscode');
+  };
+
+  const handleUnlock = async (attemptedPasscode) => {
+    const wallet = await storage.getDecryptedWallet(attemptedPasscode);
+    if (wallet) {
+      setIsUnlocked(true);
+    } else {
+      setUnlockError("Incorrect passcode. Please try again.");
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    const credentialId = storage.getWebAuthnCredentialId();
+    const success = await webauthn.authenticate(credentialId);
+    if (success) {
+      setIsUnlocked(true);
+    } else {
+      setUnlockError("Biometric authentication failed.");
+    }
   };
 
   const renderCreationStep = () => {
+    if (isUnlocked) {
+        // This is where your main application would be rendered
+        return <div className="text-white">Welcome to your wallet!</div>
+    }
+
+    if (hasCompletedOnboarding) {
+        return <UnlockScreen onUnlock={handleUnlock} hasBiometrics={hasBiometrics} onBiometricUnlock={handleBiometricUnlock} error={unlockError} clearError={() => setUnlockError('')} />
+    }
+
     switch (walletCreationStep) {
       case 'createPasscode':
         return <CreatePasscode onPasscodeCreated={handlePasscodeCreated} />;
       case 'confirmPasscode':
-        return <ConfirmPasscode originalPasscode={passcode} onPasscodeConfirmed={handlePasscodeConfirmed} />;
+        return <ConfirmPasscode originalPasscode={passcode} onPasscodeConfirmed={handlePasscodeConfirmed} onBack={handleBack} />;
+      case 'enableBiometrics':
+        return <EnableBiometrics onEnable={handleBiometricsEnabled} onSkip={handleSkipBiometrics} />;
       default:
         return <OnboardingCarousel onCreateWallet={handleCreateWalletClick} />;
     }
