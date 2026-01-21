@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Fingerprint } from './icons/Fingerprint';
+import Fingerprint from './icons/Fingerprint';
 
 const BiometricPrompt = ({ onEnable, onSkip }) => {
     const containerVariants = {
