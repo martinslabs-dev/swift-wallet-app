@@ -124,7 +124,7 @@ const variants = {
     }
 };
 
-const OnboardingCarousel = () => {
+const OnboardingCarousel = ({ onCreateWallet }) => {
     const [[page, direction], setPage] = useState([0, 0]);
     const slideIndex = wrap(0, slideContent.length, page);
 
@@ -208,6 +208,7 @@ const OnboardingCarousel = () => {
             {/* Controls */}
             <div className="w-full">
                  <motion.button 
+                    onClick={onCreateWallet}
                     className="w-full bg-energy-gradient text-black py-4 rounded-xl font-bold text-xl tracking-wider mb-4"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
