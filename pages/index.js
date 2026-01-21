@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence } from 'framer-motion';
@@ -24,6 +23,7 @@ function GatewayScreen() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [biometricError, setBiometricError] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -67,18 +67,30 @@ function GatewayScreen() {
     setWalletCreationStep('walletReady');
   };
 
+  // QUICK FIX: Ensure we show loading while attempting biometric registration and DO NOT auto-complete onboarding on failure.
   const handleBiometricEnable = async () => {
+    // Show loading immediately so user knows something is happening
+    setIsLoading(true);
+    setBiometricError("");
+
     try {
         const credentialId = await webauthn.register();
-        setIsLoading(true);
-        // Simulate a brief delay for a better user experience
-        setTimeout(async () => {
+        // If registration returns a credentialId, proceed to complete onboarding with it
+        if (credentialId) {
+            // Keep loading while we persist and finish onboarding
             await completeOnboarding(credentialId);
-            setIsLoading(false);
-        }, 2000);
+        } else {
+            // navigator.credentials.create may return null in some environments
+            setBiometricError('Biometric registration did not complete. Please try again or skip.');
+            setWalletCreationStep('biometricPrompt');
+        }
     } catch (err) {
-        console.error("Biometric registration failed, proceeding without it.", err);
-        await completeOnboarding(); // Proceed even if biometrics fail
+        console.error("Biometric registration failed:", err);
+        // Do NOT proceed to completeOnboarding here. Let the user retry or skip.
+        setBiometricError('Biometric registration failed. Make sure your device supports biometrics and try again, or skip.');
+        setWalletCreationStep('biometricPrompt');
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -88,7 +100,7 @@ function GatewayScreen() {
       setTimeout(async () => {
         await completeOnboarding();
         setIsLoading(false);
-    }, 2000);
+    }, 1200);
   };
   
   const handleWalletReadyContinue = () => setIsUnlocked(true);
@@ -143,7 +155,7 @@ function GatewayScreen() {
       case 'confirmPasscode':
         return <ConfirmPasscode originalPasscode={passcode} onPasscodeConfirmed={handlePasscodeConfirmed} onBack={handleBack} />;
       case 'biometricPrompt':
-        return <BiometricPrompt onEnable={handleBiometricEnable} onSkip={handleBiometricSkip} />;
+        return <BiometricPrompt onEnable={handleBiometricEnable} onSkip={handleBiometricSkip} error={biometricError} clearError={() => setBiometricError('')} />;
       case 'walletReady':
         return <WalletReady onContinue={handleWalletReadyContinue} />;
       default:
