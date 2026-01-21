@@ -4,15 +4,18 @@ import { AnimatePresence } from 'framer-motion';
 import OnboardingCarousel from "../components/OnboardingCarousel";
 import CreatePasscode from "../components/auth/CreatePasscode";
 import ConfirmPasscode from "../components/auth/ConfirmPasscode";
+import BiometricPrompt from "../components/auth/BiometricPrompt";
 import WalletReady from "../components/auth/WalletReady";
 import UnlockScreen from "../components/auth/UnlockScreen";
 import ResetConfirmation from "../components/auth/ResetConfirmation";
+import LoadingIndicator from "../components/auth/LoadingIndicator";
 import MainDashboard from "../components/dashboard/MainDashboard";
 import { storage } from "../utils/storage";
 import { webauthn } from "../utils/webauthn";
 
 function GatewayScreen() {
   const [mounted, setMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [walletCreationStep, setWalletCreationStep] = useState(null);
   const [passcode, setPasscode] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -49,19 +52,38 @@ function GatewayScreen() {
     setWalletCreationStep('confirmPasscode');
   };
 
-  const handlePasscodeConfirmed = async () => {
-    const walletData = { privateKey: "super-secret-private-key" };
+  const handlePasscodeConfirmed = () => {
+    setWalletCreationStep('biometricPrompt');
+  };
+
+  const completeOnboarding = async (credentialId = null) => {
+    setIsLoading(true);
+    const walletData = { privateKey: "super-secret-private-key" }; 
     await storage.saveEncryptedWallet(walletData, passcode);
+    if (credentialId) {
+        storage.setWebAuthnCredentialId(credentialId);
+    }
+    storage.setHasCompletedOnboarding();
     
+    // Simulate a brief delay for a better user experience
+    setTimeout(() => {
+        setIsLoading(false);
+        setWalletCreationStep('walletReady');
+    }, 2000);
+  };
+
+  const handleBiometricEnable = async () => {
     try {
         const credentialId = await webauthn.register();
-        storage.setWebAuthnCredentialId(credentialId);
+        await completeOnboarding(credentialId);
     } catch (err) {
-        console.error("Biometric registration skipped or failed", err);
+        console.error("Biometric registration failed, proceeding without it.", err);
+        await completeOnboarding(); // Proceed even if biometrics fail
     }
+  };
 
-    storage.setHasCompletedOnboarding();
-    setWalletCreationStep('walletReady');
+  const handleBiometricSkip = async () => {
+      await completeOnboarding();
   };
   
   const handleWalletReadyContinue = () => setIsUnlocked(true);
@@ -115,6 +137,8 @@ function GatewayScreen() {
         return <CreatePasscode onPasscodeCreated={handlePasscodeCreated} />;
       case 'confirmPasscode':
         return <ConfirmPasscode originalPasscode={passcode} onPasscodeConfirmed={handlePasscodeConfirmed} onBack={handleBack} />;
+      case 'biometricPrompt':
+        return <BiometricPrompt onEnable={handleBiometricEnable} onSkip={handleBiometricSkip} />;
       case 'walletReady':
         return <WalletReady onContinue={handleWalletReadyContinue} />;
       default:
@@ -124,6 +148,7 @@ function GatewayScreen() {
 
   return (
     <div className="cosmic-background min-h-screen flex flex-col justify-center items-center font-sans text-center overflow-hidden">
+      <LoadingIndicator show={isLoading} />
       <main className="w-full h-full flex flex-col justify-center">
          <AnimatePresence mode="wait">
             {renderContent()}
