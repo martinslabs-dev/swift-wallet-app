@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence } from 'framer-motion';
@@ -57,25 +58,24 @@ function GatewayScreen() {
   };
 
   const completeOnboarding = async (credentialId = null) => {
-    setIsLoading(true);
     const walletData = { privateKey: "super-secret-private-key" }; 
     await storage.saveEncryptedWallet(walletData, passcode);
     if (credentialId) {
         storage.setWebAuthnCredentialId(credentialId);
     }
     storage.setHasCompletedOnboarding();
-    
-    // Simulate a brief delay for a better user experience
-    setTimeout(() => {
-        setIsLoading(false);
-        setWalletCreationStep('walletReady');
-    }, 2000);
+    setWalletCreationStep('walletReady');
   };
 
   const handleBiometricEnable = async () => {
     try {
         const credentialId = await webauthn.register();
-        await completeOnboarding(credentialId);
+        setIsLoading(true);
+        // Simulate a brief delay for a better user experience
+        setTimeout(async () => {
+            await completeOnboarding(credentialId);
+            setIsLoading(false);
+        }, 2000);
     } catch (err) {
         console.error("Biometric registration failed, proceeding without it.", err);
         await completeOnboarding(); // Proceed even if biometrics fail
@@ -83,7 +83,12 @@ function GatewayScreen() {
   };
 
   const handleBiometricSkip = async () => {
-      await completeOnboarding();
+      setIsLoading(true);
+      // Simulate a brief delay for a better user experience
+      setTimeout(async () => {
+        await completeOnboarding();
+        setIsLoading(false);
+    }, 2000);
   };
   
   const handleWalletReadyContinue = () => setIsUnlocked(true);
