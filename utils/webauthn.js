@@ -1,6 +1,6 @@
 
 function bufferToBase64(buffer) {
-    return Buffer.from(buffer).toString('base64')
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=/g, '');
