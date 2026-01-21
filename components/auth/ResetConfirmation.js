@@ -77,38 +77,40 @@ const ResetConfirmation = ({ onConfirm, onCancel, show }) => {
                         className="glass-card interactive-border w-full max-w-sm p-8 text-center shadow-2xl"
                         variants={modalVariants}
                     >
-                        <AnimatedWarningIcon />
-                        <motion.h2 
-                            className="text-3xl font-bold text-white mt-6 mb-4"
-                            initial={{ y: 20, opacity: 0}} 
-                            animate={{ y: 0, opacity: 1, transition: { delay: 0.4 }}}
-                        >
-                            Are You Sure?
-                        </motion.h2>
-                        <motion.p 
-                            className="text-gray-300 mb-8"
-                            initial={{ y: 20, opacity: 0}} 
-                            animate={{ y: 0, opacity: 1, transition: { delay: 0.5 }}}
-                        >
-                            This will permanently delete all wallet data from this device. You can only recover your wallet if you have your seed phrase.
-                        </motion.p>
-                        <div className="flex flex-col space-y-4">
-                            <motion.button
-                                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold text-lg shadow-lg"
-                                onClick={onConfirm}
-                                whileHover={{ scale: 1.05, y: -2 }}
-                                whileTap={{ scale: 0.98 }}
+                        <div className="relative z-10">
+                            <AnimatedWarningIcon />
+                            <motion.h2 
+                                className="text-3xl font-bold text-white mt-6 mb-4"
+                                initial={{ y: 20, opacity: 0}} 
+                                animate={{ y: 0, opacity: 1, transition: { delay: 0.4 }}}
                             >
-                                Yes, Delete and Reset
-                            </motion.button>
-                            <motion.button
-                                className="w-full bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white py-3 rounded-xl font-bold text-lg"
-                                onClick={onCancel}
-                                whileHover={{ scale: 1.05, y: -2 }}
-                                whileTap={{ scale: 0.98 }}
+                                Are You Sure?
+                            </motion.h2>
+                            <motion.p 
+                                className="text-gray-300 mb-8"
+                                initial={{ y: 20, opacity: 0}} 
+                                animate={{ y: 0, opacity: 1, transition: { delay: 0.5 }}}
                             >
-                                Cancel
-                            </motion.button>
+                                This will permanently delete all wallet data from this device. You can only recover your wallet if you have your seed phrase.
+                            </motion.p>
+                            <div className="flex flex-col space-y-4">
+                                <motion.button
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold text-lg shadow-lg"
+                                    onClick={onConfirm}
+                                    whileHover={{ scale: 1.05, y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    Yes, Delete and Reset
+                                </motion.button>
+                                <motion.button
+                                    className="w-full bg-gray-700 bg-opacity-50 hover:bg-opacity-75 text-white py-3 rounded-xl font-bold text-lg"
+                                    onClick={onCancel}
+                                    whileHover={{ scale: 1.05, y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    Cancel
+                                </motion.button>
+                            </div>
                         </div>
                     </motion.div>
                 </motion.div>
