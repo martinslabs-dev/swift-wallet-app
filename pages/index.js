@@ -3,7 +3,6 @@ import dynamic from "next/dynamic";
 import OnboardingCarousel from "../components/OnboardingCarousel";
 import CreatePasscode from "../components/auth/CreatePasscode";
 import ConfirmPasscode from "../components/auth/ConfirmPasscode";
-import EnableBiometrics from "../components/auth/EnableBiometrics";
 import UnlockScreen from "../components/auth/UnlockScreen";
 import { storage } from "../utils/storage";
 import { webauthn } from "../utils/webauthn";
@@ -48,23 +47,14 @@ function GatewayScreen() {
   const handlePasscodeConfirmed = async () => {
     const walletData = { privateKey: "super-secret-private-key" }; // Mock wallet data
     await storage.saveEncryptedWallet(walletData, passcode);
-    setWalletCreationStep('enableBiometrics');
-  };
-
-  const handleBiometricsEnabled = async () => {
+    
     try {
         const credentialId = await webauthn.register();
         storage.setWebAuthnCredentialId(credentialId);
-        storage.setHasCompletedOnboarding();
-        setIsUnlocked(true); // Go to main app
     } catch (err) {
-        console.error("Biometric registration failed", err);
-        // If it fails, we still complete onboarding, just without biometrics
-        handleSkipBiometrics();
+        console.error("Biometric registration skipped or failed", err);
     }
-  };
 
-  const handleSkipBiometrics = () => {
     storage.setHasCompletedOnboarding();
     setIsUnlocked(true); // Go to main app
   };
@@ -107,8 +97,6 @@ function GatewayScreen() {
         return <CreatePasscode onPasscodeCreated={handlePasscodeCreated} />;
       case 'confirmPasscode':
         return <ConfirmPasscode originalPasscode={passcode} onPasscodeConfirmed={handlePasscodeConfirmed} onBack={handleBack} />;
-      case 'enableBiometrics':
-        return <EnableBiometrics onEnable={handleBiometricsEnabled} onSkip={handleSkipBiometrics} />;
       default:
         return <OnboardingCarousel onCreateWallet={handleCreateWalletClick} />;
     }
