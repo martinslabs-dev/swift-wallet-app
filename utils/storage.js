@@ -26,7 +26,7 @@ export const storage = {
     setWebAuthnCredentialId: (id) => localStorage.setItem(WEBAUTHN_KEY, id),
 
     // Clear all data
-    clearAll: () => {
+    clearAllData: () => {
         localStorage.removeItem(ONBOARDING_KEY);
         localStorage.removeItem(WALLET_KEY);
         localStorage.removeItem(WEBAUTHN_KEY);

@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { AnimatePresence } from 'framer-motion';
 import OnboardingCarousel from "../components/OnboardingCarousel";
 import CreatePasscode from "../components/auth/CreatePasscode";
 import ConfirmPasscode from "../components/auth/ConfirmPasscode";
+import WalletReady from "../components/auth/WalletReady";
 import UnlockScreen from "../components/auth/UnlockScreen";
+import ResetConfirmation from "../components/auth/ResetConfirmation";
+import MainDashboard from "../components/dashboard/MainDashboard";
 import { storage } from "../utils/storage";
 import { webauthn } from "../utils/webauthn";
 
@@ -15,13 +19,16 @@ function GatewayScreen() {
   const [unlockError, setUnlockError] = useState("");
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const onboardingStatus = storage.hasCompletedOnboarding();
     setHasCompletedOnboarding(onboardingStatus);
-    const biometricsStatus = !!storage.getWebAuthnCredentialId();
-    setHasBiometrics(biometricsStatus);
+    if (onboardingStatus) {
+        const biometricsStatus = !!storage.getWebAuthnCredentialId();
+        setHasBiometrics(biometricsStatus);
+    }
 
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
@@ -35,9 +42,7 @@ function GatewayScreen() {
     return <div className="cosmic-background w-full h-screen" />;
   }
 
-  const handleCreateWalletClick = () => {
-    setWalletCreationStep('createPasscode');
-  };
+  const handleCreateWalletClick = () => setWalletCreationStep('createPasscode');
 
   const handlePasscodeCreated = (newPasscode) => {
     setPasscode(newPasscode);
@@ -45,7 +50,7 @@ function GatewayScreen() {
   };
 
   const handlePasscodeConfirmed = async () => {
-    const walletData = { privateKey: "super-secret-private-key" }; // Mock wallet data
+    const walletData = { privateKey: "super-secret-private-key" };
     await storage.saveEncryptedWallet(walletData, passcode);
     
     try {
@@ -56,12 +61,12 @@ function GatewayScreen() {
     }
 
     storage.setHasCompletedOnboarding();
-    setIsUnlocked(true); // Go to main app
+    setWalletCreationStep('walletReady');
   };
+  
+  const handleWalletReadyContinue = () => setIsUnlocked(true);
 
-  const handleBack = () => {
-    setWalletCreationStep('createPasscode');
-  };
+  const handleBack = () => setWalletCreationStep('createPasscode');
 
   const handleUnlock = async (attemptedPasscode) => {
     const wallet = await storage.getDecryptedWallet(attemptedPasscode);
@@ -82,14 +87,27 @@ function GatewayScreen() {
     }
   };
 
-  const renderCreationStep = () => {
+  const handleResetRequest = () => setShowResetConfirmation(true);
+  const handleResetCancel = () => setShowResetConfirmation(false);
+  const handleResetConfirm = () => {
+      storage.clearAllData();
+      window.location.reload();
+  };
+
+  const renderContent = () => {
     if (isUnlocked) {
-        // This is where your main application would be rendered
-        return <div className="text-white">Welcome to your wallet!</div>
+        return <MainDashboard />;
     }
 
     if (hasCompletedOnboarding) {
-        return <UnlockScreen onUnlock={handleUnlock} hasBiometrics={hasBiometrics} onBiometricUnlock={handleBiometricUnlock} error={unlockError} clearError={() => setUnlockError('')} />
+        return <UnlockScreen 
+                  onUnlock={handleUnlock} 
+                  hasBiometrics={hasBiometrics} 
+                  onBiometricUnlock={handleBiometricUnlock} 
+                  error={unlockError} 
+                  clearError={() => setUnlockError('')} 
+                  onResetRequest={handleResetRequest}
+               />;
     }
 
     switch (walletCreationStep) {
@@ -97,6 +115,8 @@ function GatewayScreen() {
         return <CreatePasscode onPasscodeCreated={handlePasscodeCreated} />;
       case 'confirmPasscode':
         return <ConfirmPasscode originalPasscode={passcode} onPasscodeConfirmed={handlePasscodeConfirmed} onBack={handleBack} />;
+      case 'walletReady':
+        return <WalletReady onContinue={handleWalletReadyContinue} />;
       default:
         return <OnboardingCarousel onCreateWallet={handleCreateWalletClick} />;
     }
@@ -105,8 +125,15 @@ function GatewayScreen() {
   return (
     <div className="cosmic-background min-h-screen flex flex-col justify-center items-center font-sans text-center overflow-hidden">
       <main className="w-full h-full flex flex-col justify-center">
-         {renderCreationStep()}
+         <AnimatePresence mode="wait">
+            {renderContent()}
+         </AnimatePresence>
       </main>
+      <ResetConfirmation 
+        show={showResetConfirmation} 
+        onConfirm={handleResetConfirm} 
+        onCancel={handleResetCancel} 
+      />
     </div>
   );
 }
