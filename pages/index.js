@@ -297,7 +297,6 @@ function GatewayScreen() {
         )}
       </AnimatePresence>
       <ResetConfirmation show={showResetConfirmation} onConfirm={handleResetConfirm} onCancel={handleResetCancel} />
-      <LoadingIndicator show={isLoading && !!decryptedWallet} />
     </div>
   );
 }
