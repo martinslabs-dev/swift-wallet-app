@@ -2,9 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import PasscodeInput from './PasscodeInput';
-import { Fingerprint } from './icons/Fingerprint';
 
-const UnlockScreen = ({ onUnlock, hasBiometrics, onBiometricUnlock, error, clearError, onResetRequest }) => {
+const UnlockScreen = ({ onUnlock, error, clearError, onResetRequest }) => {
   const [passcode, setPasscode] = useState('');
 
   useEffect(() => {
@@ -15,6 +14,7 @@ const UnlockScreen = ({ onUnlock, hasBiometrics, onBiometricUnlock, error, clear
   }, [passcode, onUnlock]);
 
   useEffect(() => {
+    // Clear the error message after 3 seconds
     if (error) {
       const timer = setTimeout(() => {
         clearError();
@@ -25,10 +25,10 @@ const UnlockScreen = ({ onUnlock, hasBiometrics, onBiometricUnlock, error, clear
 
   return (
     <motion.div
-      className="flex flex-col justify-between h-screen w-full max-w-sm mx-auto p-6"
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -50 }}
+      className="w-full h-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
         <PasscodeInput 
             title="Welcome Back"
@@ -36,16 +36,12 @@ const UnlockScreen = ({ onUnlock, hasBiometrics, onBiometricUnlock, error, clear
             passcode={passcode}
             onPasscodeChange={setPasscode}
             error={error}
+            footer={
+                <button onClick={onResetRequest} className="text-gray-500 hover:text-gray-300 transition-colors duration-300">
+                    Forgot Passcode? Reset
+                </button>
+            }
         />
-      
-
-      <div className="w-full">
-        <div className="text-center mt-6">
-            <button onClick={onResetRequest} className="text-gray-500 hover:text-gray-300 transition-colors duration-300">
-                Forgot Passcode? Reset
-            </button>
-        </div>
-      </div>
     </motion.div>
   );
 };

@@ -3,7 +3,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import NumberKeyboard from './NumberKeyboard';
 
-const PasscodeInput = ({ title, subtitle, passcode, onPasscodeChange, error }) => {
+const PasscodeInput = ({ title, subtitle, passcode, onPasscodeChange, error, footer }) => {
 
     const handleKeyPress = (key) => {
         if (passcode.length < 6) {
@@ -46,9 +46,10 @@ const PasscodeInput = ({ title, subtitle, passcode, onPasscodeChange, error }) =
                         />
                     ))}
                 </motion.div>
+                
                 {error && (
                     <motion.p 
-                        className="text-red-500 font-bold"
+                        className="text-red-500 font-bold h-6"
                         initial={{ y: -10, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: -10, opacity: 0 }}
@@ -58,8 +59,11 @@ const PasscodeInput = ({ title, subtitle, passcode, onPasscodeChange, error }) =
                 )}
             </div>
 
-            <div className="w-full pb-8">
+            <div className="w-full pb-4">
                 <NumberKeyboard onKeyPress={handleKeyPress} onBackspace={handleBackspace} />
+                <div className="mt-6 text-center">
+                    {footer}
+                </div>
             </div>
         </motion.div>
     );

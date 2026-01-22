@@ -1,34 +1,28 @@
 
 import { encrypt, decrypt } from './crypto';
 
-const ONBOARDING_KEY = 'hasCompletedOnboarding';
-const WALLET_KEY = 'encryptedWallet';
-const WEBAUTHN_KEY = 'webauthnCredentialId';
+const getOnboardingKey = (userId) => `hasCompletedOnboarding_${userId}`;
+const getWalletKey = (userId) => `encryptedWallet_${userId}`;
 
 export const storage = {
     // Onboarding status
-    hasCompletedOnboarding: () => !!localStorage.getItem(ONBOARDING_KEY),
-    setHasCompletedOnboarding: () => localStorage.setItem(ONBOARDING_KEY, 'true'),
+    hasCompletedOnboarding: (userId) => !!localStorage.getItem(getOnboardingKey(userId)),
+    setHasCompletedOnboarding: (userId) => localStorage.setItem(getOnboardingKey(userId), 'true'),
 
     // Encrypted Wallet
-    saveEncryptedWallet: async (walletData, passcode) => {
+    saveEncryptedWallet: async (walletData, passcode, userId) => {
         const encryptedWallet = await encrypt(walletData, passcode);
-        localStorage.setItem(WALLET_KEY, encryptedWallet);
+        localStorage.setItem(getWalletKey(userId), encryptedWallet);
     },
-    getDecryptedWallet: async (passcode) => {
-        const encryptedWallet = localStorage.getItem(WALLET_KEY);
+    getDecryptedWallet: async (passcode, userId) => {
+        const encryptedWallet = localStorage.getItem(getWalletKey(userId));
         if (!encryptedWallet) return null;
         return decrypt(encryptedWallet, passcode);
     },
 
-    // WebAuthn Credential ID
-    getWebAuthnCredentialId: () => localStorage.getItem(WEBAUTHN_KEY),
-    setWebAuthnCredentialId: (id) => localStorage.setItem(WEBAUTHN_KEY, id),
-
-    // Clear all data
-    clearAllData: () => {
-        localStorage.removeItem(ONBOARDING_KEY);
-        localStorage.removeItem(WALLET_KEY);
-        localStorage.removeItem(WEBAUTHN_KEY);
+    // Clear all data for a user
+    clearAllData: (userId) => {
+        localStorage.removeItem(getOnboardingKey(userId));
+        localStorage.removeItem(getWalletKey(userId));
     }
 };
