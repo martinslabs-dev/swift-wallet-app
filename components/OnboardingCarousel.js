@@ -124,7 +124,7 @@ const variants = {
     }
 };
 
-const OnboardingCarousel = ({ onCreateWallet }) => {
+const OnboardingCarousel = ({ onCreateWallet, onAlreadyHaveWallet }) => {
     const [[page, direction], setPage] = useState([0, 0]);
     const slideIndex = wrap(0, slideContent.length, page);
 
@@ -216,6 +216,7 @@ const OnboardingCarousel = ({ onCreateWallet }) => {
                     Create new wallet
                 </motion.button>
                 <motion.button 
+                    onClick={onAlreadyHaveWallet}
                     className="w-full bg-gray-700 text-white py-4 rounded-xl font-bold text-lg"
                     whileHover={{ scale: 1.05, backgroundColor: "#4A5568" }}
                     whileTap={{ scale: 0.95 }}

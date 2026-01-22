@@ -28,7 +28,14 @@ import UsdtIcon from '../components/dashboard/icons/UsdtIcon';
 import UsdcIcon from '../components/dashboard/icons/UsdcIcon';
 
 // --- Constants ---
-const FLOW = { /* Onboarding flow steps */ }; // Kept minimal for brevity
+const FLOW = {
+    ONBOARDING: 'onboarding',
+    CREATE_PASSCODE: 'create_passcode',
+    CONFIRM_PASSCODE: 'confirm_passcode',
+    SHOW_BACKUP_PHRASE: 'show_backup_phrase',
+    VERIFY_BACKUP_PHRASE: 'verify_backup_phrase',
+    WALLET_READY: 'wallet_ready'
+  };
 const ETHERSCAN_API_KEY = 'YOUR_ETHERSCAN_API_KEY'; // Replace with your actual Etherscan API key
 
 const tokenIcons = {
@@ -88,11 +95,11 @@ function GatewayScreen() {
             setIsLoading(true);
             setDataError(null);
             try {
-                const provider = new ethers.providers.JsonRpcProvider(currentNetwork.rpcUrl);
+                const provider = new ethers.JsonRpcProvider(currentNetwork.rpcUrl);
 
                 // 1. Fetch Native Balance (ETH, SepoliaETH, etc.)
                 const balanceWei = await provider.getBalance(decryptedWallet.address);
-                setNativeBalance(parseFloat(ethers.utils.formatEther(balanceWei)).toFixed(4));
+                setNativeBalance(parseFloat(ethers.formatEther(balanceWei)).toFixed(4));
 
                 // 2. Fetch Token Balances for the current network
                 const supportedTokens = getTokensForNetwork(currentNetwork.id);
@@ -100,7 +107,7 @@ function GatewayScreen() {
                     const contract = new ethers.Contract(token.address, ERC20_ABI, provider);
                     const balanceRaw = await contract.balanceOf(decryptedWallet.address);
                     const decimals = await contract.decimals();
-                    const balanceFormatted = ethers.utils.formatUnits(balanceRaw, decimals);
+                    const balanceFormatted = ethers.formatUnits(balanceRaw, decimals);
                     return { ...token, balance: parseFloat(balanceFormatted).toFixed(2) }; 
                 });
                 setTokenBalances(await Promise.all(tokenPromises));
@@ -110,7 +117,7 @@ function GatewayScreen() {
                 const response = await fetch(url);
                 const data = await response.json();
                 if (data.status === "1") {
-                    setTransactions(data.result.map(tx => ({...tx, value: ethers.utils.formatEther(tx.value) })).reverse());
+                    setTransactions(data.result.map(tx => ({...tx, value: ethers.formatEther(tx.value) })).reverse());
                 } else {
                     setTransactions([]);
                 }
@@ -130,14 +137,14 @@ function GatewayScreen() {
   }, [decryptedWallet, currentNetwork]); // Re-run when network changes!
 
   // --- Handlers ---
-  // ... (onboarding and auth handlers remain the same)
   const handleCreateWalletClick = () => setFlowStep(FLOW.CREATE_PASSCODE);
+  const handleAlreadyHaveWalletClick = () => setHasCompletedOnboarding(true);
   const handlePasscodeCreated = (newPasscode) => { setPasscode(newPasscode); setFlowStep(FLOW.CONFIRM_PASSCODE); };
   const handlePasscodeConfirmed = () => { setMnemonic(ethers.Wallet.createRandom().mnemonic.phrase); setFlowStep(FLOW.SHOW_BACKUP_PHRASE); };
   const handleBackupContinue = () => setFlowStep(FLOW.VERIFY_BACKUP_PHRASE);
   const handlePhraseVerified = async () => {
     setIsLoading(true);
-    const wallet = ethers.Wallet.fromMnemonic(mnemonic);
+    const wallet = ethers.Wallet.fromPhrase(mnemonic); // FIX: fromMnemonic -> fromPhrase
     setDecryptedWallet(wallet);
     await storage.saveEncryptedWallet({ privateKey: wallet.privateKey, address: wallet.address }, passcode, userId);
     storage.setHasCompletedOnboarding(userId);
@@ -152,11 +159,17 @@ function GatewayScreen() {
     setUnlockError("");
     setIsLoading(true);
     const walletData = await storage.getDecryptedWallet(attemptedPasscode, userId);
-    if (walletData) {
-      setDecryptedWallet(new ethers.Wallet(walletData.privateKey));
-      setIsUnlocked(true);
+    if (walletData && walletData.privateKey) {
+      try {
+        setDecryptedWallet(new ethers.Wallet(walletData.privateKey));
+        setIsUnlocked(true);
+      } catch (error) {
+        console.error("Error creating wallet from private key:", error)
+        setUnlockError("Failed to reconstruct wallet. The stored data may be corrupt.");
+        // Optionally, offer to reset
+      }
     } else {
-      setUnlockError("Incorrect passcode.");
+      setUnlockError("Incorrect passcode or corrupt wallet data.");
     }
     setIsLoading(false);
   };
@@ -205,7 +218,7 @@ function GatewayScreen() {
         case FLOW.SHOW_BACKUP_PHRASE: return <BackupPhrase phrase={mnemonic} onContinue={handleBackupContinue} />;
         case FLOW.VERIFY_BACKUP_PHRASE: return <VerifyPhrase phrase={mnemonic} onVerified={handlePhraseVerified} />;
         case FLOW.WALLET_READY: return <WalletReady onContinue={handleWalletReadyContinue} />;
-        default: return <OnboardingCarousel onCreateWallet={handleCreateWalletClick} />;
+        default: return <OnboardingCarousel onCreateWallet={handleCreateWalletClick} onAlreadyHaveWallet={handleAlreadyHaveWalletClick} />;
     }
   };
 
