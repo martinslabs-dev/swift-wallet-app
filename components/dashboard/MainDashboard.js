@@ -14,7 +14,8 @@ const MainDashboard = ({
     error, 
     onSend, 
     onReceive, 
-    network // New prop
+    network,
+    onRefreshData // Prop for refreshing data, will be used later
 }) => {
     const [copied, setCopied] = React.useState(false);
 
@@ -32,14 +33,13 @@ const MainDashboard = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
-            className="w-full max-w-md mx-auto p-4 pt-0" // Reduced top padding
+            className="w-full max-w-md mx-auto p-4 pt-0"
         >
             {/* Main Balance Card */}
             <div className="glass-card p-6 text-white mb-6">
                 <div className="text-center mb-6">
-                    {/* Updated to use dynamic currency symbol */}
                     <p className="text-gray-400 text-lg">Total Balance ({network.currencySymbol})</p>
-                    {isLoading ? (
+                    {isLoading && transactions.length === 0 ? (
                         <div className="h-12 w-3/4 bg-gray-700/50 animate-pulse mx-auto mt-2 rounded-md"></div>
                     ) : (
                         <h1 className="text-5xl font-bold tracking-tighter">{balance}</h1>
@@ -66,7 +66,7 @@ const MainDashboard = ({
             {/* Token List */}
             <div className="glass-card p-6 text-white mb-6">
                 <h2 className="text-xl font-bold mb-4">My Tokens</h2>
-                {isLoading ? (
+                {isLoading && tokenBalances.length === 0 ? (
                     <div className="space-y-3">
                         <div className="h-16 bg-gray-700/50 animate-pulse rounded-lg"></div>
                         <div className="h-16 bg-gray-700/50 animate-pulse rounded-lg"></div>
@@ -79,7 +79,7 @@ const MainDashboard = ({
             {/* Transaction History Card */}
             <div className="glass-card p-6 text-white">
                  <h2 className="text-xl font-bold mb-4">Transaction History</h2>
-                 {isLoading ? (
+                 {isLoading && transactions.length === 0 ? (
                     <div className="text-center py-4">
                         <p className="text-gray-400">Loading history...</p>
                     </div>
@@ -88,7 +88,6 @@ const MainDashboard = ({
                         <p>{error}</p>
                     </div>
                 ) : (
-                    // Pass the network prop down
                     <TransactionHistory 
                         transactions={transactions} 
                         currentUserAddress={wallet.address} 

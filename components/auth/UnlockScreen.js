@@ -23,11 +23,9 @@ const UnlockScreen = ({ onUnlock, error, clearError, onResetRequest }) => {
     }
   }, [error, clearError]);
 
-  const isPersistentError = error && (error.includes('reconstruct') || error.includes('corrupt'));
-
   return (
     <motion.div
-      className="w-full h-full flex flex-col justify-center items-center p-4"
+      className="w-full h-full"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -38,20 +36,20 @@ const UnlockScreen = ({ onUnlock, error, clearError, onResetRequest }) => {
             passcode={passcode}
             onPasscodeChange={setPasscode}
             error={error}
+            footer={
+                <div className="text-center mt-8">
+                    <p className="text-gray-500 mb-4">Having trouble?</p>
+                    <motion.button 
+                        onClick={onResetRequest}
+                        className="bg-red-600/20 text-red-300 py-3 px-6 rounded-lg font-bold transition-all duration-300 hover:bg-red-600/40 hover:text-red-200"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        Reset Wallet
+                    </motion.button>
+                </div>
+            }
         />
-        
-        {/* Only show reset button at the bottom */}
-        <div className="absolute bottom-10 text-center">
-            <p className="text-gray-500 mb-4">Having trouble?</p>
-            <motion.button 
-                onClick={onResetRequest}
-                className="bg-red-600/20 text-red-300 py-3 px-6 rounded-lg font-bold transition-all duration-300 hover:bg-red-600/40 hover:text-red-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-            >
-                Reset Wallet
-            </motion.button>
-        </div>
     </motion.div>
   );
 };
