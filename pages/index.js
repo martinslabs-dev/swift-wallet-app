@@ -36,7 +36,6 @@ const FLOW = {
     VERIFY_BACKUP_PHRASE: 'verify_backup_phrase',
     WALLET_READY: 'wallet_ready'
   };
-const ETHERSCAN_API_KEY = 'YOUR_ETHERSCAN_API_KEY';
 
 const tokenIcons = {
   USDT: UsdtIcon,
@@ -97,7 +96,7 @@ function GatewayScreen() {
             setTokenBalances(await Promise.all(tokenPromises));
 
             // 3. Fetch Transaction History
-            const url = `${currentNetwork.etherscanApiUrl}?module=account&action=txlist&address=${decryptedWallet.address}&sort=desc&apikey=${ETHERSCAN_API_KEY}`;
+            const url = `${currentNetwork.etherscanApiUrl}?module=account&action=txlist&address=${decryptedWallet.address}&sort=desc&apikey=${process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY}`
             const response = await fetch(url);
             const data = await response.json();
             if (data.status === "1") {
@@ -297,6 +296,7 @@ function GatewayScreen() {
         )}
       </AnimatePresence>
       <ResetConfirmation show={showResetConfirmation} onConfirm={handleResetConfirm} onCancel={handleResetCancel} />
+      <LoadingIndicator show={isLoading && !!decryptedWallet} />
     </div>
   );
 }
