@@ -1,5 +1,6 @@
 
 import axios from 'axios';
+import { ethers } from 'ethers';
 
 // Minimal ERC-20 ABI for fetching balance, decimals, and name/symbol as a fallback
 export const ERC20_ABI = [
@@ -56,5 +57,37 @@ export const fetchTokensForNetwork = async (chainId) => {
         // For any error, cache the empty result to prevent repeated failures
         tokenListCache[chainId] = [];
         return [];
+    }
+};
+
+/**
+ * Fetches the details of a specific token by its contract address.
+ * @param {string} tokenAddress - The contract address of the token.
+ * @param {ethers.Provider} provider - An ethers.js provider instance.
+ * @returns {Promise<Object|null>} - A promise that resolves to an object with token details (name, symbol, decimals) or null if it fails.
+ */
+export const fetchTokenDetails = async (tokenAddress, provider) => {
+    if (!tokenAddress || !provider) {
+        console.warn('fetchTokenDetails requires a tokenAddress and a provider.');
+        return null;
+    }
+
+    try {
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+
+        // Fetch properties in parallel
+        const [name, symbol, decimals] = await Promise.all([
+            tokenContract.name(),
+            tokenContract.symbol(),
+            tokenContract.decimals()
+        ]);
+
+        const details = { address: tokenAddress, name, symbol, decimals: Number(decimals) };
+        console.log(`Fetched details for token at ${tokenAddress}:`, details);
+
+        return details;
+    } catch (error) {
+        console.error(`Failed to fetch details for token at ${tokenAddress}:`, error);
+        return null;
     }
 };

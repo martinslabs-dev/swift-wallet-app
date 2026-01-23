@@ -14,8 +14,12 @@ const MainDashboard = ({
     error, 
     onSend, 
     onReceive, 
+    onImportToken,
     network,
-    onRefreshData
+    onRefreshData,
+    onSortChange,
+    currentSort,
+    onHideToken
 }) => {
     const [copied, setCopied] = React.useState(false);
 
@@ -65,14 +69,35 @@ const MainDashboard = ({
 
             {/* Token List */}
             <div className="glass-card p-6 text-white mb-6">
-                <h2 className="text-xl font-bold mb-4">My Tokens</h2>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">My Tokens</h2>
+                    <div className="flex items-center gap-2">
+                         <button 
+                            onClick={onImportToken} 
+                            className="text-xs bg-purple-600/50 hover:bg-purple-500/50 text-white font-semibold py-1 px-2 rounded-md transition-colors"
+                        >
+                            Import
+                        </button>
+                        <select 
+                            value={currentSort} 
+                            onChange={(e) => onSortChange(e.target.value)}
+                            className="bg-gray-800 border-none text-white text-xs rounded-md focus:ring-purple-500 focus:border-purple-500 py-1 pl-2 pr-6 appearance-none"
+                        >
+                            <option value="default">Sort by Default</option>
+                            <option value="name_asc">Name (A-Z)</option>
+                            <option value="name_desc">Name (Z-A)</option>
+                            <option value="value_desc">Value (High-Low)</option>
+                        </select>
+                    </div>
+                </div>
+
                 {isLoading && tokenBalances.length === 0 ? (
                     <div className="space-y-3">
                         <div className="h-16 bg-gray-700/50 animate-pulse rounded-lg"></div>
                         <div className="h-16 bg-gray-700/50 animate-pulse rounded-lg"></div>
                     </div>
                 ) : (
-                    <AssetList tokens={tokenBalances} />
+                    <AssetList tokens={tokenBalances} onHideToken={onHideToken} />
                 )}
             </div>
 
