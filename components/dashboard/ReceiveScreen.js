@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { FiCopy, FiCheckCircle, FiX } from 'react-icons/fi';
 
 const ReceiveScreen = ({ wallet, onClose }) => {
@@ -30,7 +30,7 @@ const ReceiveScreen = ({ wallet, onClose }) => {
                 <p className="text-gray-400 mb-8">Share your address to receive funds.</p>
 
                 <div className="bg-white p-6 rounded-lg mb-8 inline-block">
-                    <QRCode value={wallet.address} size={220} bgColor="#ffffff" fgColor="#000000" />
+                    <QRCode value={wallet.address} size={220} bgColor={"#ffffff"} fgColor={"#000000"} />
                 </div>
 
                 <div className="bg-gray-800 p-4 rounded-lg break-words mb-6">
