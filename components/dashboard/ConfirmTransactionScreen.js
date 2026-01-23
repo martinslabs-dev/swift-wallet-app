@@ -1,82 +1,177 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ethers } from 'ethers';
 import { FiX, FiCheckCircle, FiLoader, FiAlertTriangle, FiExternalLink } from 'react-icons/fi';
 import { ERC20_ABI } from '../../utils/tokens';
+import * as bitcoin from 'bitcoinjs-lib';
+import { BIP32Factory } from 'bip32';
+import * as ecc from 'tiny-secp256k1';
+import axios from 'axios';
+
+const bip32 = BIP32Factory(ecc);
+const SATOSHIS_PER_BTC = 100_000_000;
 
 const ConfirmTransactionScreen = ({ wallet, transaction, onCancel, onComplete, network }) => {
-    const [status, setStatus] = useState('idle'); // idle, estimating, confirming, sending, success, error
-    const [gasFee, setGasFee] = useState(null);
+    const [status, setStatus] = useState('idle');
+    const [fee, setFee] = useState(null);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        const estimateGas = async () => {
-            setStatus('estimating');
-            setError('');
-            try {
-                const provider = new ethers.JsonRpcProvider(network.rpcUrl);
-                const { toAddress, amount, asset } = transaction;
+    const estimateEvmGas = useCallback(async () => {
+        setStatus('estimating');
+        setError('');
+        try {
+            const provider = new ethers.JsonRpcProvider(network.rpcUrl);
+            const { toAddress, amount, asset } = transaction;
 
-                let gasEstimate;
-                if (asset.address) { // Token
-                    const tokenContract = new ethers.Contract(asset.address, ERC20_ABI, provider);
-                    const decimals = await tokenContract.decimals();
-                    const amountInSmallestUnit = ethers.parseUnits(amount, decimals);
-                    gasEstimate = await tokenContract.transfer.estimateGas(toAddress, amountInSmallestUnit, { from: wallet.address });
-                } else { // Native asset
-                    gasEstimate = await provider.estimateGas({ to: toAddress, value: ethers.parseEther(amount) });
-                }
-                const feeData = await provider.getFeeData();
-                const gasPrice = feeData.gasPrice;
-                const gasCost = ethers.formatEther(gasEstimate * gasPrice);
-                setGasFee(parseFloat(gasCost).toFixed(6));
-                setStatus('confirming');
-            } catch (err) {
-                console.error("Gas estimation error:", err);
-                setError('Could not estimate gas. The transaction may fail.');
-                setStatus('error');
+            let gasEstimate;
+            if (asset.address) { // Token
+                const tokenContract = new ethers.Contract(asset.address, ERC20_ABI, provider);
+                const decimals = await tokenContract.decimals();
+                const amountInSmallestUnit = ethers.parseUnits(amount, decimals);
+                gasEstimate = await tokenContract.transfer.estimateGas(toAddress, amountInSmallestUnit, { from: wallet.address });
+            } else { // Native asset
+                gasEstimate = await provider.estimateGas({ to: toAddress, value: ethers.parseEther(amount) });
             }
-        };
-
-        if (wallet && transaction) {
-            estimateGas();
+            const feeData = await provider.getFeeData();
+            const gasPrice = feeData.gasPrice;
+            const gasCost = ethers.formatEther(gasEstimate * gasPrice);
+            setFee(parseFloat(gasCost).toFixed(6));
+            setStatus('confirming');
+        } catch (err) {
+            console.error("Gas estimation error:", err);
+            setError('Could not estimate gas. The transaction may fail.');
+            setStatus('error');
         }
     }, [wallet, transaction, network.rpcUrl]);
+
+    const estimateBitcoinFee = useCallback(async () => {
+        setStatus('estimating');
+        setError('');
+        try {
+            const { toAddress, amount } = transaction;
+            const amountSats = Math.round(parseFloat(amount) * SATOSHIS_PER_BTC);
+
+            const { data: feeRates } = await axios.get(`${network.etherscanApiUrl}/fee-estimates`);
+            const feeRate = feeRates.fastestFee; // Use the fastest fee for now
+
+            // Dummy transaction for size estimation
+            const psbt = new bitcoin.Psbt({ network: network.bitcoinjslib_network });
+            // A typical P2WPKH input is ~68 bytes.
+            // We assume one input for simplicity, though this is not accurate.
+            // A more accurate estimation requires fetching UTXOs first.
+            psbt.addInput({ hash: '0'.repeat(64), index: 0, witnessUtxo: { script: Buffer.alloc(22), value: amountSats } });
+            psbt.addOutput({ address: toAddress, value: amountSats });
+            psbt.addOutput({ address: wallet.bitcoin.address, value: 0 }); // Change output
+
+            const txSize = psbt.extractTransaction(true).toBuffer().length + 2; // Add a couple of bytes for safety
+            const calculatedFee = txSize * feeRate;
+            setFee((calculatedFee / SATOSHIS_PER_BTC).toFixed(8));
+            setStatus('confirming');
+        } catch (err) {
+            console.error("Bitcoin fee estimation error:", err);
+            setError('Could not estimate network fee.');
+            setStatus('error');
+        }
+    }, [wallet, transaction, network]);
+
+    useEffect(() => {
+        if (wallet && transaction) {
+            if (network.chainType === 'evm') {
+                estimateEvmGas();
+            } else if (network.chainType === 'bitcoin') {
+                estimateBitcoinFee();
+            }
+        }
+    }, [wallet, transaction, network, estimateEvmGas, estimateBitcoinFee]);
+
+    const handleConfirmEvm = async () => {
+        const provider = new ethers.JsonRpcProvider(network.rpcUrl);
+        const signer = new ethers.Wallet(wallet.privateKey, provider);
+        const { toAddress, amount, asset } = transaction;
+
+        let txResponse;
+        if (asset.address) { // Token transfer
+            const tokenContract = new ethers.Contract(asset.address, ERC20_ABI, signer);
+            const decimals = await tokenContract.decimals();
+            const amountInSmallestUnit = ethers.parseUnits(amount, decimals);
+            txResponse = await tokenContract.transfer(toAddress, amountInSmallestUnit);
+        } else { // Native asset transfer
+            txResponse = await signer.sendTransaction({
+                to: toAddress,
+                value: ethers.parseEther(amount)
+            });
+        }
+        return txResponse;
+    };
+
+    const handleConfirmBitcoin = async () => {
+        const { toAddress, amount } = transaction;
+        const amountSats = Math.round(parseFloat(amount) * SATOSHIS_PER_BTC);
+        const feeRate = parseFloat(fee) * SATOSHIS_PER_BTC / 100; // Simplified fee rate calc
+
+        const { data: utxos } = await axios.get(`${network.etherscanApiUrl}/address/${wallet.bitcoin.address}/utxo`);
+        
+        const psbt = new bitcoin.Psbt({ network: network.bitcoinjslib_network });
+        const keyPair = bip32.fromBase58(wallet.bitcoin.bip32.toBase58(), network.bitcoinjslib_network);
+
+        let totalInput = 0;
+        utxos.forEach(utxo => {
+            totalInput += utxo.value;
+            psbt.addInput({ 
+                hash: utxo.txid, 
+                index: utxo.vout,
+                witnessUtxo: { script: Buffer.from(utxo.scriptpubkey, 'hex'), value: utxo.value },
+            });
+        });
+
+        const estimatedTxSize = utxos.length * 68 + 2 * 34 + 10;
+        const estimatedFee = estimatedTxSize * feeRate;
+        const change = totalInput - amountSats - estimatedFee;
+
+        if (change < 0) {
+            throw new Error('Insufficient funds for transaction and fees.');
+        }
+
+        psbt.addOutput({ address: toAddress, value: amountSats });
+        if (change > 546) { // Dust limit
+            psbt.addOutput({ address: wallet.bitcoin.address, value: change });
+        }
+
+        psbt.signAllInputs(keyPair);
+        psbt.finalizeAllInputs();
+
+        const txHex = psbt.extractTransaction().toHex();
+        const { data: txId } = await axios.post(`${network.etherscanApiUrl}/tx`, txHex);
+        
+        // The response is just the txid string, so we create a mock response object
+        return {
+            hash: txId,
+            from: wallet.bitcoin.address,
+            to: toAddress,
+            value: amount,
+            wait: async () => Promise.resolve() // Bitcoin txs don't have a `wait` like ethers
+        };
+    };
 
     const handleConfirm = async () => {
         setStatus('sending');
         setError('');
         try {
-            const provider = new ethers.JsonRpcProvider(network.rpcUrl);
-            const signer = new ethers.Wallet(wallet.privateKey, provider);
-            const { toAddress, amount, asset } = transaction;
-
             let txResponse;
-            if (asset.address) { // Token transfer
-                const tokenContract = new ethers.Contract(asset.address, ERC20_ABI, signer);
-                const decimals = await tokenContract.decimals();
-                const amountInSmallestUnit = ethers.parseUnits(amount, decimals);
-                txResponse = await tokenContract.transfer(toAddress, amountInSmallestUnit);
-            } else { // Native asset transfer
-                txResponse = await signer.sendTransaction({
-                    to: toAddress,
-                    value: ethers.parseEther(amount)
-                });
+            if (network.chainType === 'evm') {
+                txResponse = await handleConfirmEvm();
+            } else if (network.chainType === 'bitcoin') {
+                txResponse = await handleConfirmBitcoin();
             }
-            
-            // --- THIS IS THE KEY CHANGE ---
-            // Immediately call onComplete with the transaction response.
-            // The parent component will now handle monitoring.
             onComplete(txResponse);
-
         } catch (err) {
-            console.error("Transaction failed:", err);
-            setError('Transaction failed. Not enough funds for gas?');
+            console.error("Transaction failed:", err.response ? err.response.data : err.message);
+            setError(err.message || 'Transaction failed.');
             setStatus('error');
         }
     };
-    
+
     const renderMainContent = () => {
         const { toAddress, amount, asset } = transaction;
         return (
@@ -93,11 +188,11 @@ const ConfirmTransactionScreen = ({ wallet, transaction, onCancel, onComplete, n
                     </div>
                      <div className="border-t border-gray-700 my-2"></div>
                     <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Gas Fee:</span>
-                        {status === 'estimating' || gasFee === null ? (
+                        <span className="text-gray-400">{network.chainType === 'bitcoin' ? 'Network Fee' : 'Gas Fee'}:</span>
+                        {status === 'estimating' || fee === null ? (
                             <span className="font-mono text-sm">Estimating...</span>
                         ) : (
-                            <span className="font-mono text-sm">~{gasFee} {network.currencySymbol}</span>
+                            <span className="font-mono text-sm">~{fee} {network.currencySymbol}</span>
                         )}
                     </div>
                 </div>

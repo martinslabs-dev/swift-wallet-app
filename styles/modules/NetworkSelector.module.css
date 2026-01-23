@@ -1,0 +1,41 @@
+
+.networkSelectorContainer {
+    display: flex;
+    align-items: center;
+    background-color: #2c2c2c;
+    border-radius: 20px;
+    padding: 5px 15px;
+    border: 1px solid #444;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.networkIcon {
+    font-size: 1rem;
+    margin-right: 8px;
+}
+
+.networkSelector {
+    background-color: transparent;
+    border: none;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none; /* Removes default styling for Safari */
+    -moz-appearance: none;    /* Removes default styling for Firefox */
+    appearance: none;
+}
+
+.networkSelector:hover {
+    color: #a0a0a0;
+}
+
+/* Styling for the dropdown options */
+.networkSelector option {
+    background-color: #333;
+    color: #fff;
+    border: none;
+    padding: 10px;
+}

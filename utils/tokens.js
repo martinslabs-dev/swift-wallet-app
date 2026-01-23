@@ -1,45 +1,50 @@
 
-// Minimal ERC-20 ABI for fetching balance and decimals
+import axios from 'axios';
+
+// Minimal ERC-20 ABI for fetching balance, decimals, and name/symbol as a fallback
 export const ERC20_ABI = [
     { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "balance", "type": "uint256" }], "type": "function" },
-    { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "type": "function" }
+    { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "type": "function" },
+    { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
+    { "constant": true, "inputs": [], "name": "name", "outputs": [{ "name": "", "type": "string" }], "type": "function" }
 ];
 
-// Supported token contracts for different networks
-export const SUPPORTED_TOKENS = {
-    USDT: {
-        name: 'Tether USD',
-        symbol: 'USDT',
-        networks: {
-            mainnet: { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
-            sepolia: { address: '0xaA8E23Fb4C70490F1d2dF9f14D2705Db53eC822e' },
-        }
-    },
-    USDC: {
-        name: 'USD Coin',
-        symbol: 'USDC',
-        networks: {
-            mainnet: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
-            sepolia: { address: '0x94a9D9AC8a22534E3FaCa422B727b124bB9B776c' },
-        }
-    },
-    // Add other tokens here
-};
+// In-memory cache for token lists to prevent redundant API calls
+const tokenListCache = {};
 
 /**
- * A helper function to get the list of tokens supported on a specific network.
- * @param {string} networkId - The ID of the network (e.g., 'mainnet', 'sepolia').
- * @returns {Array} - A list of token objects with their network-specific address.
+ * Fetches a list of tokens for a given network from the 1inch API.
+ * Implements in-memory caching.
+ * @param {number} chainId - The chain ID of the network.
+ * @returns {Promise<Array>} - A promise that resolves to an array of token objects.
  */
-export const getTokensForNetwork = (networkId) => {
-    return Object.values(SUPPORTED_TOKENS).map(token => {
-        if (token.networks[networkId]) {
-            return {
-                name: token.name,
-                symbol: token.symbol,
-                address: token.networks[networkId].address
-            };
-        }
-        return null;
-    }).filter(Boolean); // Filter out tokens not available on the specified network
+export const fetchTokensForNetwork = async (chainId) => {
+    if (!chainId) {
+        console.warn('No chainId provided to fetchTokensForNetwork');
+        return [];
+    }
+
+    // Return from cache if available
+    if (tokenListCache[chainId]) {
+        return tokenListCache[chainId];
+    }
+
+    try {
+        // Using 1inch token list API. v1.2 is the latest as of writing.
+        const url = `https://tokens.1inch.io/v1.2/${chainId}`;
+        const response = await axios.get(url);
+
+        // The token data from 1inch is an object where keys are token addresses
+        const tokens = Object.values(response.data.tokens);
+
+        // Store in cache for subsequent requests
+        tokenListCache[chainId] = tokens;
+
+        console.log(`Fetched and cached ${tokens.length} tokens for chainId ${chainId}.`);
+        return tokens;
+    } catch (error) {
+        console.error(`Failed to fetch token list for chainId ${chainId}:`, error);
+        // Return an empty array on failure to prevent the app from crashing
+        return [];
+    }
 };

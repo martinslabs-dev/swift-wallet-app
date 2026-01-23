@@ -15,7 +15,7 @@ const MainDashboard = ({
     onSend, 
     onReceive, 
     network,
-    onRefreshData // Prop for refreshing data, will be used later
+    onRefreshData
 }) => {
     const [copied, setCopied] = React.useState(false);
 

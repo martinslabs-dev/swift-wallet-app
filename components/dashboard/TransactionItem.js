@@ -6,56 +6,70 @@ import { formatDistanceToNow } from 'date-fns';
 
 const TransactionItem = ({ tx, currentUserAddress, network }) => {
     const [displayName, setDisplayName] = useState('');
+    
+    // Determine direction and the other party's address
     const isSent = tx.from.toLowerCase() === currentUserAddress.toLowerCase();
     const otherAddress = isSent ? tx.to : tx.from;
-    
-    // Handle custom status for pending/failed transactions
-    const timeAgo = tx.status ? '' : formatDistanceToNow(new Date(tx.timeStamp * 1000), { addSuffix: true });
 
-    const explorerTxUrl = `${network.explorerUrl}/tx/${tx.hash}`;
-    // A transaction is clickable if it has a hash and is not pending/failed
+    // Format the timestamp
+    const timeAgo = tx.timeStamp ? formatDistanceToNow(new Date(tx.timeStamp * 1000), { addSuffix: true }) : 'just now';
+
+    // Generate the correct explorer URL based on the network type
+    const explorerTxUrl = `${network.explorerUrl}/${network.chainType === 'solana' ? 'tx' : 'tx'}/${tx.hash}`;
     const isClickable = tx.hash && tx.status !== 'pending' && tx.status !== 'failed';
 
     useEffect(() => {
         const resolveName = async () => {
-            try {
-                // Ethers v6 syntax
-                const provider = new ethers.JsonRpcProvider(network.rpcUrl);
-                const name = await provider.lookupAddress(otherAddress);
-                if (name) {
-                    setDisplayName(name);
-                } else {
+            // Only try to resolve ENS names for EVM chains
+            if (network.chainType === 'evm' && otherAddress) {
+                try {
+                    const provider = new ethers.JsonRpcProvider(network.rpcUrl);
+                    const name = await provider.lookupAddress(otherAddress);
+                    if (name) {
+                        setDisplayName(name);
+                    } else {
+                        setDisplayName(`${otherAddress.substring(0, 6)}...${otherAddress.substring(otherAddress.length - 4)}`);
+                    }
+                } catch (error) {
                     setDisplayName(`${otherAddress.substring(0, 6)}...${otherAddress.substring(otherAddress.length - 4)}`);
                 }
-            } catch (error) {
-                setDisplayName(`${otherAddress.substring(0, 6)}...${otherAddress.substring(otherAddress.length - 4)}`);
+            } else if (otherAddress) {
+                // For Solana and other non-EVM chains, just format the address
+                setDisplayName(`${otherAddress.substring(0, 4)}...${otherAddress.substring(otherAddress.length - 4)}`);
             }
         };
-
-        if (otherAddress) {
-            resolveName();
-        }
-    }, [otherAddress, network.rpcUrl]);
+        
+        resolveName();
+    }, [otherAddress, network.rpcUrl, network.chainType]);
 
     const renderStatus = () => {
         if (tx.status === 'pending') {
-            return (
-                <div className="flex items-center gap-2 text-yellow-400">
-                    <FiLoader className="animate-spin"/>
-                    <span>Sending...</span>
-                </div>
-            );
+            return <div className="flex items-center gap-2 text-yellow-400"><FiLoader className="animate-spin"/><span>Pending...</span></div>;
         }
         if (tx.status === 'failed') {
-            return (
-                <div className="flex items-center gap-2 text-red-500">
-                    <FiAlertTriangle />
-                    <span>Failed</span>
-                </div>
-            );
+            return <div className="flex items-center gap-2 text-red-500"><FiAlertTriangle /><span>Failed</span></div>;
         }
+        // For Solana, a successful status from the RPC is definitive.
+        if (tx.status === 'success' || tx.confirmationStatus === 'finalized') {
+            return <p className="text-gray-500 text-sm">{timeAgo}</p>;
+        }
+        // Default for EVM transactions without a custom status (assumed successful)
         return <p className="text-gray-500 text-sm">{timeAgo}</p>;
     }
+
+    const formatValue = () => {
+        let value = tx.value || '0';
+        let symbol = network.currencySymbol;
+
+        // For EVM, the value is in Wei and needs to be formatted
+        if (network.chainType === 'evm') {
+            // The value might be a BigNumber from a pending TX, so we use toString()
+            return `${parseFloat(ethers.formatEther(value.toString())).toFixed(4)} ${symbol}`;
+        }
+        
+        // For Solana, the value is already in SOL from our service
+        return `${parseFloat(value).toFixed(4)} ${symbol}`;
+    };
 
     const Wrapper = isClickable ? 'a' : 'div';
     const wrapperProps = isClickable ? { href: explorerTxUrl, target: '_blank', rel: 'noopener noreferrer' } : {};
@@ -73,9 +87,8 @@ const TransactionItem = ({ tx, currentUserAddress, network }) => {
                     </div>
                 </div>
                 <div className="text-right">
-                     <p className={`font-bold text-lg ${isSent ? 'text-blue-400' : 'text-green-400'}`}>
-                        {/* The value might be a BigNumber from the pending TX, format it */}
-                        {parseFloat(ethers.formatEther(tx.value.toString())).toFixed(4)} {network.currencySymbol}
+                    <p className={`font-bold text-lg ${isSent ? 'text-blue-400' : 'text-green-400'}`}>
+                        {formatValue()}
                     </p>
                    {renderStatus()}
                 </div>
