@@ -3,7 +3,7 @@ export const NETWORKS = {
     mainnet: {
         id: 'mainnet',
         name: 'Ethereum Mainnet',
-        rpcUrl: `https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID`, // Replace with your Infura ID
+        rpcUrl: `https://mainnet.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_PROJECT_ID}`,
         explorerUrl: 'https://etherscan.io',
         currencySymbol: 'ETH',
         etherscanApiUrl: 'https://api.etherscan.io/api',
@@ -11,7 +11,7 @@ export const NETWORKS = {
     sepolia: {
         id: 'sepolia',
         name: 'Sepolia Testnet',
-        rpcUrl: 'https://rpc.sepolia.org',
+        rpcUrl: `https://sepolia.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_PROJECT_ID}`,
         explorerUrl: 'https://sepolia.etherscan.io',
         currencySymbol: 'SepoliaETH',
         etherscanApiUrl: 'https://api-sepolia.etherscan.io/api',
