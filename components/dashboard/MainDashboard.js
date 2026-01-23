@@ -1,9 +1,10 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FiCopy, FiCheckCircle, FiArrowUp, FiArrowDown } from 'react-icons/fi';
+import { FiCopy, FiCheckCircle } from 'react-icons/fi';
 import TransactionHistory from './TransactionHistory';
 import AssetList from './AssetList';
+import ActionButtons from './ActionButtons'; // Import the new component
 
 const MainDashboard = ({ 
     wallet, 
@@ -13,7 +14,8 @@ const MainDashboard = ({
     isLoading, 
     error, 
     onSend, 
-    onReceive, 
+    onReceive,
+    onSwap, // Add onSwap prop
     onImportToken,
     network,
     onRefreshData,
@@ -50,14 +52,8 @@ const MainDashboard = ({
                     )}
                 </div>
 
-                <div className="flex justify-center gap-4 mb-6">
-                    <button onClick={onSend} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors duration-300">
-                        <FiArrowUp /> Send
-                    </button>
-                    <button onClick={onReceive} className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors duration-300">
-                        <FiArrowDown /> Receive
-                    </button>
-                </div>
+                {/* Use the new ActionButtons component */}
+                <ActionButtons onSend={onSend} onReceive={onReceive} onSwap={onSwap} />
 
                 <div className="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between text-sm">
                     <p className="font-mono truncate pr-4">{wallet.address}</p>

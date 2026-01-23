@@ -23,6 +23,7 @@ import LoadingIndicator from "../components/auth/LoadingIndicator";
 import MainDashboard from "../components/dashboard/MainDashboard";
 import ReceiveScreen from "../components/dashboard/ReceiveScreen";
 import SendScreen from "../components/dashboard/SendScreen";
+import SwapScreen from "../components/dashboard/SwapScreen"; // Import SwapScreen
 import ConfirmTransactionScreen from "../components/dashboard/ConfirmTransactionScreen";
 import NetworkSelector from "../components/NetworkSelector";
 import ImportToken from "../components/ImportToken";
@@ -53,6 +54,7 @@ function GatewayScreen() {
     const [showResetConfirmation, setShowResetConfirmation] = useState(false);
     const [showReceiveScreen, setShowReceiveScreen] = useState(false);
     const [showSendScreen, setShowSendScreen] = useState(false);
+    const [showSwapScreen, setShowSwapScreen] = useState(false); // Add state for SwapScreen
     const [showConfirmScreen, setShowConfirmScreen] = useState(false);
     const [showImportTokenModal, setShowImportTokenModal] = useState(false);
     const [nativeBalance, setNativeBalance] = useState('0.00');
@@ -209,6 +211,7 @@ function GatewayScreen() {
                         error={dataError}
                         onSend={() => setShowSendScreen(true)}
                         onReceive={() => setShowReceiveScreen(true)}
+                        onSwap={() => setShowSwapScreen(true)} // Pass onSwap handler
                         onImportToken={() => setShowImportTokenModal(true)}
                         network={activeNetwork}
                         onRefreshData={fetchAllData}
@@ -239,8 +242,9 @@ function GatewayScreen() {
             </main>
             <AnimatePresence>
                 {showReceiveScreen && decryptedWallet && <ReceiveScreen wallet={{ address: getDisplayAddress() }} onClose={() => setShowReceiveScreen(false)} />}
-                {showSendScreen && decryptedWallet && <SendScreen onClose={() => setShowSendScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSendScreen(false); setShowConfirmScreen(true); }} ethBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}
-                {showConfirmScreen && decryptedWallet && transactionDetails && <ConfirmTransactionScreen wallet={decryptedWallet} transaction={transactionDetails} onCancel={() => handleTransactionSubmitted(null)} onComplete={handleTransactionSubmitted} network={activeNetwork} />}
+                {showSendScreen && decryptedWallet && <SendScreen userId={userId} sessionPasscode={sessionPasscode} onClose={() => setShowSendScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSendScreen(false); setShowConfirmScreen(true); }} ethBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}
+                {showSwapScreen && <SwapScreen onClose={() => setShowSwapScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSwapScreen(false); setShowConfirmScreen(true); }} nativeBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}
+                {showConfirmScreen && decryptedWallet && transactionDetails && <ConfirmTransactionScreen wallet={decryptedWallet} transaction={transactionDetails} onCancel={() => {setTransactionDetails(null); setShowConfirmScreen(false);}} onComplete={() => {setTransactionDetails(null); setShowConfirmScreen(false); fetchAllData();}} network={activeNetwork} />}
                 {showImportTokenModal && decryptedWallet && (
                     <ImportToken 
                         onClose={() => setShowImportTokenModal(false)}

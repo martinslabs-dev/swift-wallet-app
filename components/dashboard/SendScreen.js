@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ethers } from 'ethers';
-import { FiX, FiArrowRight, FiChevronDown, FiLoader } from 'react-icons/fi';
+import { FiX, FiArrowRight, FiChevronDown, FiLoader, FiBook, FiCamera } from 'react-icons/fi';
+import AddressBook from './AddressBook';
+import QRCodeScanner from './QRCodeScanner'; // Import the QR code scanner
 
 // A simple component to render an asset with its icon and balance
 const AssetDisplay = ({ asset, balance, icon: Icon, currencySymbol }) => (
@@ -24,6 +26,8 @@ const SendScreen = ({ onClose, onConfirm, ethBalance, tokenBalances, icons, netw
     const [amount, setAmount] = useState('');
     const [addressError, setAddressError] = useState('');
     const [amountError, setAmountError] = useState('');
+    const [showAddressBook, setShowAddressBook] = useState(false);
+    const [showQRScanner, setShowQRScanner] = useState(false); // State for QR scanner
     
     const nativeAsset = { symbol: 'ETH', balance: ethBalance, isNative: true };
     const [selectedAsset, setSelectedAsset] = useState(nativeAsset);
@@ -52,7 +56,7 @@ const SendScreen = ({ onClose, onConfirm, ethBalance, tokenBalances, icons, netw
             setAddressError('');
             try {
                  // Use the RPC URL from the current network
-                const provider = new ethers.providers.JsonRpcProvider(network.rpcUrl);
+                const provider = new ethers.JsonRpcProvider(network.rpcUrl);
                 const resolved = await provider.resolveName(toAddress);
                 if (resolved) {
                     setResolvedAddress(resolved);
@@ -64,7 +68,7 @@ const SendScreen = ({ onClose, onConfirm, ethBalance, tokenBalances, icons, netw
             } finally {
                 setIsResolving(false);
             }
-        } else if (toAddress && !ethers.utils.isAddress(toAddress)) {
+        } else if (toAddress && !ethers.isAddress(toAddress)) {
             setAddressError('Invalid Ethereum address or ENS name.');
         } else {
             setAddressError('');
@@ -93,21 +97,32 @@ const SendScreen = ({ onClose, onConfirm, ethBalance, tokenBalances, icons, netw
         }
     };
 
+    const handleSelectContact = (address) => {
+        setToAddress(address);
+        setShowAddressBook(false);
+        if (addressError) setAddressError('');
+    };
+
+    const handleQRCodeScanned = (data) => {
+        setToAddress(data);
+        setShowQRScanner(false);
+    };
+
     const handleSubmit = () => {
         const finalAddress = resolvedAddress || toAddress;
-        if (!addressError && !amountError && finalAddress && amount && ethers.utils.isAddress(finalAddress)) {
+        if (!addressError && !amountError && finalAddress && amount && ethers.isAddress(finalAddress)) {
             // Pass the correct currency symbol for the native asset
             const assetToConfirm = selectedAsset.isNative 
                 ? { ...selectedAsset, symbol: network.currencySymbol } 
                 : selectedAsset;
             onConfirm({ toAddress: finalAddress, amount, asset: assetToConfirm });
-        } else if (!ethers.utils.isAddress(finalAddress)) {
+        } else if (!ethers.isAddress(finalAddress)) {
              setAddressError('A valid address or resolved ENS name is required.');
         }
     };
 
     const finalAddressForValidation = resolvedAddress || toAddress;
-    const isFormValid = !addressError && !amountError && finalAddressForValidation && ethers.utils.isAddress(finalAddressForValidation) && parseFloat(amount) > 0;
+    const isFormValid = !addressError && !amountError && finalAddressForValidation && ethers.isAddress(finalAddressForValidation) && parseFloat(amount) > 0;
 
     const SelectedAssetIcon = selectedAsset.isNative ? () => <span className="text-2xl">♦</span> : icons[selectedAsset.symbol];
 
@@ -152,7 +167,19 @@ const SendScreen = ({ onClose, onConfirm, ethBalance, tokenBalances, icons, netw
 
                     {/* Recipient Address */}
                     <div>
-                        <label className="block text-gray-400 text-sm font-bold mb-2" htmlFor="address">Recipient</label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-gray-400 text-sm font-bold" htmlFor="address">Recipient</label>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => setShowAddressBook(true)} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300">
+                                    <FiBook />
+                                    <span>Address Book</span>
+                                </button>
+                                <button onClick={() => setShowQRScanner(true)} className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300">
+                                    <FiCamera />
+                                    <span>Scan QR</span>
+                                </button>
+                            </div>
+                        </div>
                         <div className="relative flex items-center">
                              <input id="address" type="text" value={toAddress} onChange={handleAddressChange} onBlur={handleAddressBlur} className={`w-full bg-gray-800 border-2 ${addressError ? 'border-red-500' : 'border-gray-700'} rounded-lg p-3 pr-10 text-white focus:outline-none focus:border-blue-500`} placeholder="Address or ENS name (e.g., vitalik.eth)" />
                              {isResolving && <FiLoader className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />}
@@ -179,6 +206,20 @@ const SendScreen = ({ onClose, onConfirm, ethBalance, tokenBalances, icons, netw
                     </button>
                 </div>
             </div>
+            <AnimatePresence>
+                {showAddressBook && (
+                    <AddressBook 
+                        onClose={() => setShowAddressBook(false)} 
+                        onSelectContact={handleSelectContact} 
+                    />
+                )}
+                {showQRScanner && (
+                    <QRCodeScanner 
+                        onClose={() => setShowQRScanner(false)}
+                        onScan={handleQRCodeScanned}
+                    />
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };

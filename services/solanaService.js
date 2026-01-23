@@ -1,5 +1,7 @@
 
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 
 export const fetchSolanaData = async (wallet, network) => {
     const connection = new Connection(network.rpcUrl, 'confirmed');
@@ -15,9 +17,42 @@ export const fetchSolanaData = async (wallet, network) => {
     const balanceLamports = await connection.getBalance(publicKey);
     const nativeBalance = (balanceLamports / LAMPORTS_PER_SOL).toFixed(4);
 
-    // 2. Fetch Token Balances (SPL Tokens) - Placeholder
-    const tokenBalances = []; // TODO: Implement SPL token fetching
+    // 2. Fetch SPL Token Balances efficiently
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+        programId: TOKEN_PROGRAM_ID,
+    });
 
+    const tokenBalances = await Promise.all(
+        tokenAccounts.value.map(async ({ account }) => {
+            const { mint, tokenAmount } = account.data.parsed.info;
+            
+            if (tokenAmount.decimals === 0 || tokenAmount.uiAmount === 0) {
+                return null; // Skip tokens with 0 balance or no decimals
+            }
+
+            let tokenMetadata = { name: 'Unknown', symbol: 'N/A' };
+            try {
+                const mintPublicKey = new PublicKey(mint);
+                const pda = await Metadata.getPDA(mintPublicKey);
+                const metadata = await Metadata.load(connection, pda);
+                tokenMetadata = {
+                    name: metadata.data.data.name.replace(/\x00/g, ''), // Remove null characters
+                    symbol: metadata.data.data.symbol.replace(/\x00/g, ''),
+                };
+            } catch (e) {
+                console.warn(`Could not fetch metadata for mint ${mint}:`, e);
+            }
+            
+            return {
+                address: mint,
+                name: tokenMetadata.name,
+                symbol: tokenMetadata.symbol,
+                balance: tokenAmount.uiAmountString,
+                decimals: tokenAmount.decimals,
+            };
+        })
+    );
+    
     // 3. Fetch Transaction History
     const signatureInfos = await connection.getSignaturesForAddress(publicKey, { limit: 20 });
     const transactions = await Promise.all(signatureInfos.map(async (signatureInfo) => {
@@ -55,5 +90,7 @@ export const fetchSolanaData = async (wallet, network) => {
 
     const validTransactions = transactions.filter(t => t !== null);
 
-    return { nativeBalance, tokenBalances, transactions: validTransactions };
+    const validTokenBalances = tokenBalances.filter(t => t !== null);
+
+    return { nativeBalance, tokenBalances: validTokenBalances, transactions: validTransactions };
 };

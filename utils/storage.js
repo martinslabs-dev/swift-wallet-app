@@ -73,6 +73,32 @@ export const storage = {
         const walletData = await getDecryptedWallet(passcode, userId);
         return walletData?.preferences?.sort || 'default'; // Default sort order
     },
+    
+    // Contact Management
+    getContacts: async (userId, passcode) => {
+        const walletData = await getDecryptedWallet(passcode, userId);
+        return walletData?.contacts || [];
+    },
+    saveContact: async (contact, userId, passcode) => {
+        const walletData = await getDecryptedWallet(passcode, userId);
+        if (!walletData) return false;
+        if (!walletData.contacts) walletData.contacts = [];
+        const existingIndex = walletData.contacts.findIndex(c => c.address === contact.address);
+        if (existingIndex > -1) {
+            walletData.contacts[existingIndex] = contact; // Update existing
+        } else {
+            walletData.contacts.push(contact); // Add new
+        }
+        await saveEncryptedWallet(walletData, passcode, userId);
+        return true;
+    },
+    deleteContact: async (address, userId, passcode) => {
+        const walletData = await getDecryptedWallet(passcode, userId);
+        if (!walletData || !walletData.contacts) return false;
+        walletData.contacts = walletData.contacts.filter(c => c.address !== address);
+        await saveEncryptedWallet(walletData, passcode, userId);
+        return true;
+    },
 
     // Clear all data for a user
     clearAllData: (userId) => {

@@ -1,29 +1,28 @@
+
 import { motion } from 'framer-motion';
-import { FiPlus, FiSend, FiDollarSign, FiZap } from 'react-icons/fi';
+import { FiArrowUp, FiArrowDown, FiZap } from 'react-icons/fi';
 
-const ActionButtons = () => {
-  const buttons = [
-    { icon: <FiSend />, label: 'Send' },
-    { icon: <FiPlus />, label: 'Fund' },
-    { icon: <FiDollarSign />, label: 'Sell' },
-    { icon: <FiZap />, label: 'Swap' },
-  ];
+const ActionButton = ({ icon, label, onClick }) => (
+    <motion.div
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        className="flex flex-col items-center space-y-2 cursor-pointer"
+        onClick={onClick}
+    >
+        <div className="flex items-center justify-center w-16 h-16 bg-gray-800/60 backdrop-blur-sm rounded-full shadow-lg border border-gray-700/50">
+            <div className="text-white text-2xl">{icon}</div>
+        </div>
+        <p className="text-sm text-gray-300 font-semibold">{label}</p>
+    </motion.div>
+);
 
+
+const ActionButtons = ({ onSend, onReceive, onSwap }) => {
   return (
-    <div className="flex justify-center items-center space-x-6 my-8">
-      {buttons.map((button, index) => (
-        <motion.div
-          key={index}
-          whileHover={{ scale: 1.1, rotate: 5 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex flex-col items-center space-y-2 cursor-pointer"
-        >
-          <div className="bg-gray-800 rounded-full p-4 shadow-lg">
-            <div className="text-white text-2xl">{button.icon}</div>
-          </div>
-          <p className="text-sm text-gray-400 font-semibold">{button.label}</p>
-        </motion.div>
-      ))}
+    <div className="flex justify-center items-center space-x-6 my-6">
+      <ActionButton icon={<FiArrowUp />} label="Send" onClick={onSend} />
+      <ActionButton icon={<FiArrowDown />} label="Receive" onClick={onReceive} />
+      <ActionButton icon={<FiZap />} label="Swap" onClick={onSwap} />
     </div>
   );
 };
