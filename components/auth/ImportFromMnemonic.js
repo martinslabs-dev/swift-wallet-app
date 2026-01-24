@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import BackArrow from './icons/BackArrow'; // Corrected import
-import { bip39 } from 'bip39';
+import * as bip39 from 'bip39';
 
 const ImportFromMnemonic = ({ onMnemonicSubmit, onBack }) => {
     const [mnemonic, setMnemonic] = useState('');
