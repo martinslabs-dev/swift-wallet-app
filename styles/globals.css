@@ -3,70 +3,50 @@
 @tailwind utilities;
 
 @layer base {
+  @keyframes background-pan {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
   body {
-    @apply bg-midnight-blue text-white font-sans;
+    @apply text-slate-100 font-sans;
+    background-color: #000;
   }
 }
 
 @layer components {
-  .cosmic-background {
-    background-color: #0B0F1A;
-    background-image: url('/cosmic-background.jpg');
-    background-size: cover;
-    background-position: center;
+  .theme-gradient {
+    background-image: linear-gradient(90deg, #00FFFF, #FF00FF);
+  }
+
+  .theme-gradient-text {
+    @apply theme-gradient;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .glass-card {
-    @apply bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-lg transition-all duration-300;
+    @apply bg-slate-900/50 backdrop-blur-xl border border-slate-700/60 rounded-2xl;
+    box-shadow: 0 0 40px -10px rgba(0, 255, 255, 0.1), 0 0 40px -10px rgba(255, 0, 255, 0.1);
+  }
+
+  .action-button {
+    @apply flex flex-col items-center justify-center space-y-2 text-slate-100 font-semibold transition-transform duration-200;
+  }
+
+  .action-button-orb {
+    @apply w-14 h-14 bg-slate-800/70 rounded-full flex items-center justify-center text-xl transition-all duration-300 ease-in-out;
   }
   
-  .glass-card:hover {
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+  .action-button-orb:hover {
+    @apply bg-slate-700/90 scale-110 shadow-lg;
+    box-shadow: 0 0 20px 0px rgba(0, 255, 255, 0.4), 0 0 20px 0px rgba(255, 0, 255, 0.4);
   }
-
-  .interactive-border {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .interactive-border::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -50%;
-    width: 200%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, #00FFFF, #FF00FF, transparent);
-    background-size: 200% 200%;
-    animation: gradient-flow 4s linear infinite;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-
-  .glass-card.active .interactive-border::before {
-    opacity: 1;
-  }
-
-  .swap-orb {
-    @apply relative w-16 h-16 rounded-full cursor-pointer flex items-center justify-center transition-all duration-300;
-    background: radial-gradient(circle, rgba(0, 255, 255, 0.4) 0%, rgba(255, 0, 255, 0.4) 100%);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 0 15px #00FFFF, 0 0 25px #FF00FF;
-  }
-  
-  .swap-orb:hover {
-    transform: scale(1.1);
-    box-shadow: 0 0 25px #00FFFF, 0 0 40px #FF00FF;
-  }
-}
-
-/* Set a modern, clean font */
-body {
-    font-family: 'Satoshi', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-}
-
-@keyframes gradient-flow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
 }

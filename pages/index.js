@@ -23,7 +23,7 @@ import LoadingIndicator from "../components/auth/LoadingIndicator";
 import MainDashboard from "../components/dashboard/MainDashboard";
 import ReceiveScreen from "../components/dashboard/ReceiveScreen";
 import SendScreen from "../components/dashboard/SendScreen";
-import SwapScreen from "../components/dashboard/SwapScreen"; // Import SwapScreen
+import SwapScreen from "../components/dashboard/SwapScreen";
 import ConfirmTransactionScreen from "../components/dashboard/ConfirmTransactionScreen";
 import NetworkSelector from "../components/NetworkSelector";
 import ImportToken from "../components/ImportToken";
@@ -54,12 +54,13 @@ function GatewayScreen() {
     const [showResetConfirmation, setShowResetConfirmation] = useState(false);
     const [showReceiveScreen, setShowReceiveScreen] = useState(false);
     const [showSendScreen, setShowSendScreen] = useState(false);
-    const [showSwapScreen, setShowSwapScreen] = useState(false); // Add state for SwapScreen
+    const [showSwapScreen, setShowSwapScreen] = useState(false);
     const [showConfirmScreen, setShowConfirmScreen] = useState(false);
     const [showImportTokenModal, setShowImportTokenModal] = useState(false);
     const [nativeBalance, setNativeBalance] = useState('0.00');
     const [tokenBalances, setTokenBalances] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [portfolioData, setPortfolioData] = useState({ totalValue: '0.00', change24h: 0, change24hValue: 0 });
     const [transactionDetails, setTransactionDetails] = useState(null);
     const [dataError, setDataError] = useState(null);
     const [ethersProvider, setEthersProvider] = useState(null);
@@ -83,31 +84,46 @@ function GatewayScreen() {
             let data;
             if (activeNetwork.chainType === 'evm') {
                 data = await fetchEvmData(decryptedWallet, activeNetwork);
-                const customTokens = await storage.getCustomTokens(activeNetwork.chainId, userId, sessionPasscode);
-                let customTokenBalances = [];
-                if (customTokens.length > 0 && ethersProvider) {
-                    const promises = customTokens.map(async t => {
-                        try {
-                            const contract = new ethers.Contract(t.address, ERC20_ABI, ethersProvider);
-                            const bal = await contract.balanceOf(decryptedWallet.evm.address);
-                            return { ...t, balance: ethers.formatUnits(bal, t.decimals) };
-                        } catch { return { ...t, balance: '0' }; }
-                    });
-                    customTokenBalances = await Promise.all(promises);
-                }
-                const combined = [...(data?.tokenBalances || [])];
-                customTokenBalances.forEach(ct => { if (!combined.some(t => t.address.toLowerCase() === ct.address.toLowerCase())) combined.push(ct); });
-                setTokenBalances(combined);
             } else if (activeNetwork.chainType === 'solana') {
                 data = await fetchSolanaData(decryptedWallet, activeNetwork);
-                setTokenBalances(data.tokenBalances);
             } else if (activeNetwork.chainType === 'bitcoin') {
                 data = await fetchBitcoinData(decryptedWallet, activeNetwork);
-                setTokenBalances(data.tokenBalances);
             }
-            if (data) { setNativeBalance(data.nativeBalance); setTransactions(data.transactions); }
-        } catch (err) { console.error("Fetch Error:", err); setDataError("Could not load wallet data.");
-        } finally { setIsLoading(false); }
+            
+            if (data) {
+                setNativeBalance(data.nativeBalance);
+                setTransactions(data.transactions || []);
+                setPortfolioData(data.portfolio || { totalValue: '0.00', change24h: 0, change24hValue: 0 });
+
+                // Handle custom tokens separately for EVM
+                let finalTokenList = data.tokenBalances || [];
+                if (activeNetwork.chainType === 'evm') {
+                    const customTokens = await storage.getCustomTokens(activeNetwork.chainId, userId, sessionPasscode);
+                    if (customTokens.length > 0 && ethersProvider) {
+                        const customTokenPromises = customTokens.map(async t => {
+                            try {
+                                const contract = new ethers.Contract(t.address, ERC20_ABI, ethersProvider);
+                                const balanceRaw = await contract.balanceOf(decryptedWallet.evm.address);
+                                const balance = ethers.formatUnits(balanceRaw, t.decimals);
+                                // Mock market data for custom tokens for now
+                                return { ...t, balance, value_usd: '0.00', price_change_24h: 0 };
+                            } catch { return { ...t, balance: '0', value_usd: '0.00', price_change_24h: 0 }; }
+                        });
+                        const customTokenBalances = await Promise.all(customTokenPromises);
+                        // Combine and remove duplicates
+                        const combined = [...finalTokenList];
+                        customTokenBalances.forEach(ct => { if (!combined.some(t => t.address.toLowerCase() === ct.address.toLowerCase())) combined.push(ct); });
+                        finalTokenList = combined;
+                    }
+                }
+                setTokenBalances(finalTokenList);
+            }
+        } catch (err) {
+            console.error("Fetch Error:", err);
+            setDataError("Could not load wallet data.");
+        } finally {
+            setIsLoading(false);
+        }
     }, [decryptedWallet, activeNetwork, userId, sessionPasscode, ethersProvider]);
 
     useEffect(() => {
@@ -153,11 +169,11 @@ function GatewayScreen() {
         setIsLoading(false);
     };
 
-    // --- New Handlers for Sorting/Hiding ---
     const handleHideToken = async (tokenAddress) => {
         if (!tokenAddress || !userId || !sessionPasscode) return;
         const lowerCaseAddress = tokenAddress.toLowerCase();
-        setHiddenTokens(prev => [...prev, lowerCaseAddress]);
+        const newHiddenTokens = [...hiddenTokens, lowerCaseAddress];
+        setHiddenTokens(newHiddenTokens);
         await storage.hideToken(lowerCaseAddress, activeNetwork.chainId, userId, sessionPasscode);
     };
 
@@ -169,7 +185,6 @@ function GatewayScreen() {
 
     const handleTokenImported = () => { fetchAllData(); };
 
-    // --- Processed Token List (Memoized) ---
     const processedTokenBalances = useMemo(() => {
         const visibleTokens = tokenBalances.filter(token => 
             !hiddenTokens.includes(token.address?.toLowerCase())
@@ -178,11 +193,10 @@ function GatewayScreen() {
         switch (sortPreference) {
             case 'name_asc': return [...visibleTokens].sort((a, b) => a.name.localeCompare(b.name));
             case 'name_desc': return [...visibleTokens].sort((a, b) => b.name.localeCompare(a.name));
-            case 'value_desc': return [...visibleTokens].sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
+            case 'value_desc': return [...visibleTokens].sort((a, b) => parseFloat(b.value_usd) - parseFloat(a.value_usd));
             default: return visibleTokens;
         }
     }, [tokenBalances, hiddenTokens, sortPreference]);
-
 
     const getDisplayAddress = () => {
         if (!decryptedWallet) return '';
@@ -194,7 +208,6 @@ function GatewayScreen() {
         }
     };
 
-    // --- Render Logic ---
     const renderContent = () => {
         if (isLoading && !decryptedWallet) return <LoadingIndicator show={true} />;
 
@@ -204,17 +217,16 @@ function GatewayScreen() {
                     <header className="w-full max-w-md mx-auto p-4 flex justify-end"><NetworkSelector /></header>
                     <MainDashboard 
                         wallet={{ address: getDisplayAddress() }}
-                        balance={nativeBalance}
+                        portfolio={portfolioData}
                         tokenBalances={processedTokenBalances}
                         transactions={transactions}
                         isLoading={isLoading}
                         error={dataError}
                         onSend={() => setShowSendScreen(true)}
                         onReceive={() => setShowReceiveScreen(true)}
-                        onSwap={() => setShowSwapScreen(true)} // Pass onSwap handler
+                        onSwap={() => setShowSwapScreen(true)}
                         onImportToken={() => setShowImportTokenModal(true)}
                         network={activeNetwork}
-                        onRefreshData={fetchAllData}
                         onSortChange={handleSortChange}
                         currentSort={sortPreference}
                         onHideToken={handleHideToken}

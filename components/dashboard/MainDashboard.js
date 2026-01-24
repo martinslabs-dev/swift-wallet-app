@@ -1,29 +1,28 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiCopy, FiCheckCircle } from 'react-icons/fi';
-import TransactionHistory from './TransactionHistory';
-import AssetList from './AssetList';
-import ActionButtons from './ActionButtons'; // Import the new component
+import ActionButtons from './ActionButtons';
+import AssetTabs from './AssetTabs';
 
-const MainDashboard = ({ 
-    wallet, 
-    balance, 
-    tokenBalances, 
-    transactions, 
-    isLoading, 
-    error, 
-    onSend, 
+const MainDashboard = ({
+    wallet,
+    portfolio,
+    tokenBalances,
+    transactions,
+    isLoading,
+    error,
+    onSend,
     onReceive,
-    onSwap, // Add onSwap prop
+    onSwap,
     onImportToken,
+    onTokenClick,
     network,
-    onRefreshData,
     onSortChange,
     currentSort,
-    onHideToken
+    onHideToken,
 }) => {
-    const [copied, setCopied] = React.useState(false);
+    const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
         if (wallet?.address) {
@@ -33,90 +32,63 @@ const MainDashboard = ({
         }
     };
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { staggerChildren: 0.15, delayChildren: 0.2 } }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 30 },
+        visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
+    };
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
-            className="w-full max-w-md mx-auto p-4 pt-0"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            exit={{ opacity: 0 }}
+            className="w-full max-w-4xl mx-auto p-4 md:p-6"
         >
-            {/* Main Balance Card */}
-            <div className="glass-card p-6 text-white mb-6">
-                <div className="text-center mb-6">
-                    <p className="text-gray-400 text-lg">Total Balance ({network.currencySymbol})</p>
-                    {isLoading && transactions.length === 0 ? (
-                        <div className="h-12 w-3/4 bg-gray-700/50 animate-pulse mx-auto mt-2 rounded-md"></div>
-                    ) : (
-                        <h1 className="text-5xl font-bold tracking-tighter">{balance}</h1>
-                    )}
-                </div>
-
-                {/* Use the new ActionButtons component */}
-                <ActionButtons onSend={onSend} onReceive={onReceive} onSwap={onSwap} />
-
-                <div className="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between text-sm">
-                    <p className="font-mono truncate pr-4">{wallet.address}</p>
-                    <button onClick={handleCopy} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
-                        {copied ? <FiCheckCircle className="text-green-400" /> : <FiCopy />}
-                    </button>
-                </div>
-            </div>
-
-            {/* Token List */}
-            <div className="glass-card p-6 text-white mb-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">My Tokens</h2>
-                    <div className="flex items-center gap-2">
-                         <button 
-                            onClick={onImportToken} 
-                            className="text-xs bg-purple-600/50 hover:bg-purple-500/50 text-white font-semibold py-1 px-2 rounded-md transition-colors"
-                        >
-                            Import
+            <motion.div variants={itemVariants} className="glass-card p-6 md:p-8 mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-center">
+                    <div className='text-center md:text-left mb-4 md:mb-0'>
+                        <h2 className="text-lg font-medium text-slate-300 mb-1">Total Balance</h2>
+                        <p className="text-5xl font-bold theme-gradient-text tracking-tight">
+                            ${portfolio.totalValue ? parseFloat(portfolio.totalValue).toFixed(2) : '0.00'}
+                        </p>
+                    </div>
+                    <div
+                        onClick={handleCopy}
+                        className="flex items-center space-x-3 bg-slate-800/60 p-3 rounded-full cursor-pointer hover:bg-slate-700/80 transition-colors border border-slate-700"
+                    >
+                        <span className="text-sm font-mono text-slate-300 truncate max-w-[150px] md:max-w-[200px]">{wallet.address}</span>
+                        <button className="text-slate-400 hover:text-white transition-colors">
+                            {copied ? <FiCheckCircle className="text-cyan-400" /> : <FiCopy />}
                         </button>
-                        <select 
-                            value={currentSort} 
-                            onChange={(e) => onSortChange(e.target.value)}
-                            className="bg-gray-800 border-none text-white text-xs rounded-md focus:ring-purple-500 focus:border-purple-500 py-1 pl-2 pr-6 appearance-none"
-                        >
-                            <option value="default">Sort by Default</option>
-                            <option value="name_asc">Name (A-Z)</option>
-                            <option value="name_desc">Name (Z-A)</option>
-                            <option value="value_desc">Value (High-Low)</option>
-                        </select>
                     </div>
                 </div>
+            </motion.div>
 
-                {isLoading && tokenBalances.length === 0 ? (
-                    <div className="space-y-3">
-                        <div className="h-16 bg-gray-700/50 animate-pulse rounded-lg"></div>
-                        <div className="h-16 bg-gray-700/50 animate-pulse rounded-lg"></div>
-                    </div>
-                ) : (
-                    <AssetList tokens={tokenBalances} onHideToken={onHideToken} />
-                )}
-            </div>
+            <motion.div variants={itemVariants} className="mb-6">
+                <ActionButtons onSend={onSend} onReceive={onReceive} onSwap={onSwap} />
+            </motion.div>
 
-            {/* Transaction History Card */}
-            <div className="glass-card p-6 text-white">
-                 <h2 className="text-xl font-bold mb-4">Transaction History</h2>
-                 {isLoading && transactions.length === 0 ? (
-                    <div className="text-center py-4">
-                        <p className="text-gray-400">Loading history...</p>
-                    </div>
-                ) : error ? (
-                     <div className="text-center py-4 text-red-400">
-                        <p>{error}</p>
-                    </div>
-                ) : (
-                    <TransactionHistory 
-                        transactions={transactions} 
-                        currentUserAddress={wallet.address} 
-                        network={network} 
-                    />
-                )}
-            </div>
-
+            <motion.div variants={itemVariants}>
+                <AssetTabs
+                    tokens={tokenBalances}
+                    transactions={transactions}
+                    onTokenClick={onTokenClick}
+                    onImportToken={onImportToken}
+                    network={network}
+                    onSortChange={onSortChange}
+                    currentSort={currentSort}
+                    onHideToken={onHideToken}
+                    currentUserAddress={wallet.address}
+                    isLoading={isLoading}
+                    error={error}
+                />
+            </motion.div>
         </motion.div>
     );
 };

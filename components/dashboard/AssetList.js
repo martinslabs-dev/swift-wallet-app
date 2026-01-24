@@ -1,29 +1,51 @@
 
 import React from 'react';
 import AssetListItem from './AssetListItem';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 
-const AssetList = ({ tokens, onHideToken }) => {
+const AssetList = ({ tokens, onHideToken, onTokenClick, isLoading, error }) => {
+    if (isLoading && (!tokens || tokens.length === 0)) {
+        return (
+            <div className="text-center py-10">
+                <p className="text-gray-500 dark:text-gray-400">Loading tokens...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="text-center py-10 text-red-500">
+                <p>Error loading tokens.</p>
+            </div>
+        );
+    }
+
     if (!tokens || tokens.length === 0) {
         return (
-            <div className="text-center py-4 text-gray-400">
-                <p>No token balances found.</p>
+            <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                <p className="text-gray-500 dark:text-gray-400">You have no tokens on this network.</p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-2">
+        <motion.div 
+            className="space-y-2"
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            transition={{ staggerChildren: 0.07 }}
+        >
             <AnimatePresence>
                 {tokens.map((token) => (
                     <AssetListItem 
-                        key={token.address || token.symbol} 
+                        key={token.address || token.symbol}
                         token={token} 
-                        onHide={() => onHideToken(token.address)} 
+                        onHideToken={onHideToken} 
+                        onTokenClick={onTokenClick}
                     />
                 ))}
             </AnimatePresence>
-        </div>
+        </motion.div>
     );
 };
 
