@@ -27,15 +27,30 @@ import SwapScreen from "../components/dashboard/SwapScreen";
 import ConfirmTransactionScreen from "../components/dashboard/ConfirmTransactionScreen";
 import NetworkSelector from "../components/NetworkSelector";
 import ImportToken from "../components/ImportToken";
+import ImportWallet from "../components/auth/ImportWallet";
+import ImportFromMnemonic from "../components/auth/ImportFromMnemonic";
+import ImportFromPrivateKey from "../components/auth/ImportFromPrivateKey";
+import AddViewOnlyWallet from "../components/auth/AddViewOnlyWallet";
 
 // --- Util & Asset Imports ---
 import { storage } from "../utils/storage";
-import { deriveWalletFromMnemonic, reconstructWallet } from "../utils/wallet";
+import { deriveWalletFromMnemonic, deriveWalletFromPrivateKey, createViewOnlyWallet, reconstructWallet } from "../utils/wallet";
 import { ERC20_ABI } from "../utils/tokens";
 import UsdtIcon from '../components/dashboard/icons/UsdtIcon';
 import UsdcIcon from '../components/dashboard/icons/UsdcIcon';
 
-const FLOW = { ONBOARDING: 'onboarding', CREATE_PASSCODE: 'create_passcode', CONFIRM_PASSCODE: 'confirm_passcode', SHOW_BACKUP_PHRASE: 'show_backup_phrase', VERIFY_BACKUP_PHRASE: 'verify_backup_phrase', WALLET_READY: 'wallet_ready' };
+const FLOW = {
+    ONBOARDING: 'onboarding',
+    CREATE_PASSCODE: 'create_passcode',
+    CONFIRM_PASSCODE: 'confirm_passcode',
+    SHOW_BACKUP_PHRASE: 'show_backup_phrase',
+    VERIFY_BACKUP_PHRASE: 'verify_backup_phrase',
+    WALLET_READY: 'wallet_ready',
+    IMPORT_WALLET: 'import_wallet',
+    IMPORT_FROM_MNEMONIC: 'import_from_mnemonic',
+    IMPORT_FROM_PRIVATE_KEY: 'import_from_private_key',
+    ADD_VIEW_ONLY_WALLET: 'add_view_only_wallet'
+};
 const tokenIcons = { USDT: UsdtIcon, USDC: UsdcIcon };
 
 function GatewayScreen() {
@@ -45,6 +60,8 @@ function GatewayScreen() {
     const [passcode, setPasscode] = useState("");
     const [sessionPasscode, setSessionPasscode] = useState("");
     const [mnemonic, setMnemonic] = useState("");
+    const [importedPrivateKey, setImportedPrivateKey] = useState(null);
+    const [importNetworkId, setImportNetworkId] = useState(null);
     const [decryptedWallet, setDecryptedWallet] = useState(null);
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [unlockError, setUnlockError] = useState("");
@@ -77,7 +94,15 @@ function GatewayScreen() {
     }, [activeNetwork]);
 
     const fetchAllData = useCallback(async () => {
-        if (!decryptedWallet || !userId || !sessionPasscode) return;
+        if (!decryptedWallet || !userId) return;
+        // No fetching needed if it's a view-only wallet with no real session passcode
+        if (decryptedWallet.viewOnly && !sessionPasscode) {
+             if (decryptedWallet.viewOnly.address) {
+                // You could implement a view-only data fetching logic here if desired
+            }
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
         setDataError(null);
         try {
@@ -95,9 +120,8 @@ function GatewayScreen() {
                 setTransactions(data.transactions || []);
                 setPortfolioData(data.portfolio || { totalValue: '0.00', change24h: 0, change24hValue: 0 });
 
-                // Handle custom tokens separately for EVM
                 let finalTokenList = data.tokenBalances || [];
-                if (activeNetwork.chainType === 'evm') {
+                if (activeNetwork.chainType === 'evm' && sessionPasscode) { // Ensure sessionPasscode exists for custom tokens
                     const customTokens = await storage.getCustomTokens(activeNetwork.chainId, userId, sessionPasscode);
                     if (customTokens.length > 0 && ethersProvider) {
                         const customTokenPromises = customTokens.map(async t => {
@@ -105,12 +129,10 @@ function GatewayScreen() {
                                 const contract = new ethers.Contract(t.address, ERC20_ABI, ethersProvider);
                                 const balanceRaw = await contract.balanceOf(decryptedWallet.evm.address);
                                 const balance = ethers.formatUnits(balanceRaw, t.decimals);
-                                // Mock market data for custom tokens for now
                                 return { ...t, balance, value_usd: '0.00', price_change_24h: 0 };
                             } catch { return { ...t, balance: '0', value_usd: '0.00', price_change_24h: 0 }; }
                         });
                         const customTokenBalances = await Promise.all(customTokenPromises);
-                        // Combine and remove duplicates
                         const combined = [...finalTokenList];
                         customTokenBalances.forEach(ct => { if (!combined.some(t => t.address.toLowerCase() === ct.address.toLowerCase())) combined.push(ct); });
                         finalTokenList = combined;
@@ -141,10 +163,35 @@ function GatewayScreen() {
     useEffect(() => { if (decryptedWallet) { fetchAllData(); const i = setInterval(fetchAllData, 30000); return () => clearInterval(i); } }, [decryptedWallet, fetchAllData]);
 
     // --- Wallet & Auth Handlers ---
-    const handlePasscodeConfirmed = () => { setMnemonic(ethers.Wallet.createRandom().mnemonic.phrase); setFlowStep(FLOW.SHOW_BACKUP_PHRASE); };
+    const handlePasscodeConfirmed = async () => {
+        setIsLoading(true);
+        if (mnemonic) {
+            const wallet = await deriveWalletFromMnemonic(mnemonic);
+            await completeWalletSetup(wallet);
+        } else if (importedPrivateKey && importNetworkId) {
+            const wallet = deriveWalletFromPrivateKey(importedPrivateKey, importNetworkId);
+            if (wallet) {
+                await completeWalletSetup(wallet);
+            } else {
+                // Handle error: private key is invalid for the network
+                setIsLoading(false);
+                setFlowStep(FLOW.IMPORT_FROM_PRIVATE_KEY); 
+            }
+        } else {
+            // This is the create new wallet flow
+            setMnemonic(ethers.Wallet.createRandom().mnemonic.phrase);
+            setIsLoading(false);
+            setFlowStep(FLOW.SHOW_BACKUP_PHRASE);
+        }
+    };
+    
     const handlePhraseVerified = async () => {
         setIsLoading(true);
         const wallet = await deriveWalletFromMnemonic(mnemonic);
+        await completeWalletSetup(wallet);
+    };
+
+    const completeWalletSetup = async (wallet) => {
         setDecryptedWallet(wallet);
         await storage.saveEncryptedWallet(wallet, passcode, userId);
         storage.setHasCompletedOnboarding(userId);
@@ -153,24 +200,56 @@ function GatewayScreen() {
         setFlowStep(FLOW.WALLET_READY);
     };
 
+    const handleMnemonicImportSubmit = (importedMnemonic) => {
+        setMnemonic(importedMnemonic);
+        setFlowStep(FLOW.CREATE_PASSCODE);
+    };
+
+    const handlePrivateKeyImportSubmit = (key, networkId) => {
+        setImportedPrivateKey(key);
+        setImportNetworkId(networkId);
+        setFlowStep(FLOW.CREATE_PASSCODE);
+    };
+
+    const handleViewOnlyAddressSubmit = async (address, networkId) => {
+        setIsLoading(true);
+        const viewOnlyWallet = createViewOnlyWallet(address, networkId);
+        if (viewOnlyWallet) {
+            // For view-only wallets, we don't encrypt. We save it differently.
+            // This could be a separate storage function if we need to store multiple view-only wallets.
+            // For now, we'll just treat it as the main wallet.
+            await storage.saveEncryptedWallet(viewOnlyWallet, "view-only", userId); // Use a placeholder for passcode
+            storage.setHasCompletedOnboarding(userId);
+            setDecryptedWallet(viewOnlyWallet);
+            setSessionPasscode("view-only"); // Use a placeholder session passcode
+            setIsUnlocked(true);
+        }
+        setIsLoading(false);
+    };
+
     const handleUnlock = async (attemptedPasscode) => {
         setUnlockError("");
         setIsLoading(true);
         const walletData = await storage.getDecryptedWallet(attemptedPasscode, userId);
         if (walletData) {
-            setDecryptedWallet(reconstructWallet(walletData));
-            setSessionPasscode(attemptedPasscode);
-            const hidden = await storage.getHiddenTokens(activeNetwork.chainId, userId, attemptedPasscode);
-            const sort = await storage.getSortPreference(userId, attemptedPasscode);
-            setHiddenTokens(hidden);
-            setSortPreference(sort);
+             if (walletData.viewOnly) {
+                setDecryptedWallet(walletData);
+                setSessionPasscode("view-only");
+            } else {
+                setDecryptedWallet(reconstructWallet(walletData));
+                setSessionPasscode(attemptedPasscode);
+                const hidden = await storage.getHiddenTokens(activeNetwork.chainId, userId, attemptedPasscode);
+                const sort = await storage.getSortPreference(userId, attemptedPasscode);
+                setHiddenTokens(hidden);
+                setSortPreference(sort);
+            }
             setIsUnlocked(true);
         } else { setUnlockError("Incorrect passcode."); }
         setIsLoading(false);
     };
 
     const handleHideToken = async (tokenAddress) => {
-        if (!tokenAddress || !userId || !sessionPasscode) return;
+        if (!tokenAddress || !userId || !sessionPasscode || sessionPasscode === 'view-only') return;
         const lowerCaseAddress = tokenAddress.toLowerCase();
         const newHiddenTokens = [...hiddenTokens, lowerCaseAddress];
         setHiddenTokens(newHiddenTokens);
@@ -178,7 +257,7 @@ function GatewayScreen() {
     };
 
     const handleSortChange = async (newSort) => {
-        if (!userId || !sessionPasscode) return;
+        if (!userId || !sessionPasscode || sessionPasscode === 'view-only') return;
         setSortPreference(newSort);
         await storage.setSortPreference(newSort, userId, sessionPasscode);
     };
@@ -197,16 +276,19 @@ function GatewayScreen() {
             default: return visibleTokens;
         }
     }, [tokenBalances, hiddenTokens, sortPreference]);
-
+    
     const getDisplayAddress = () => {
         if (!decryptedWallet) return '';
+        if (decryptedWallet.viewOnly) return decryptedWallet.viewOnly.address;
         switch (activeNetwork.chainType) {
-            case 'evm': return decryptedWallet.evm.address;
-            case 'solana': return decryptedWallet.solana.address;
-            case 'bitcoin': return decryptedWallet.bitcoin.address;
+            case 'evm': return decryptedWallet.evm?.address;
+            case 'solana': return decryptedWallet.solana?.address;
+            case 'bitcoin': return decryptedWallet.bitcoin?.address;
             default: return '';
         }
     };
+    
+    const isViewOnly = decryptedWallet?.viewOnly != null;
 
     const renderContent = () => {
         if (isLoading && !decryptedWallet) return <LoadingIndicator show={true} />;
@@ -230,20 +312,25 @@ function GatewayScreen() {
                         onSortChange={handleSortChange}
                         currentSort={sortPreference}
                         onHideToken={handleHideToken}
+                        isViewOnly={isViewOnly}
                     />
                 </div>
             );
         }
 
-        if (hasCompletedOnboarding) return <UnlockScreen onUnlock={handleUnlock} error={unlockError} clearError={() => setUnlockError('')} onResetRequest={() => setShowResetConfirmation(true)} />;
+        if (hasCompletedOnboarding) return <UnlockScreen onUnlock={handleUnlock} error={unlockError} clearError={() => setUnlockError('')} onResetRequest={() => setShowResetConfirmation(true)} onImportWallet={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
 
         switch (flowStep) {
-            case FLOW.CREATE_PASSCODE: return <CreatePasscode onPasscodeCreated={(p) => { setPasscode(p); setFlowStep(FLOW.CONFIRM_PASSCODE); }} />;
+            case FLOW.CREATE_PASSCODE: return <CreatePasscode onPasscodeCreated={(p) => { setPasscode(p); setFlowStep(FLOW.CONFIRM_PASSCODE); }} />
             case FLOW.CONFIRM_PASSCODE: return <ConfirmPasscode originalPasscode={passcode} onPasscodeConfirmed={handlePasscodeConfirmed} onBack={() => setFlowStep(FLOW.CREATE_PASSCODE)} />;
             case FLOW.SHOW_BACKUP_PHRASE: return <BackupPhrase phrase={mnemonic} onContinue={() => setFlowStep(FLOW.VERIFY_BACKUP_PHRASE)} />;
             case FLOW.VERIFY_BACKUP_PHRASE: return <VerifyPhrase phrase={mnemonic} onVerified={handlePhraseVerified} />;
             case FLOW.WALLET_READY: return <WalletReady onContinue={() => { setHasCompletedOnboarding(true); setIsUnlocked(true); }} />;
-            default: return <OnboardingCarousel onCreateWallet={() => setFlowStep(FLOW.CREATE_PASSCODE)} onAlreadyHaveWallet={() => setHasCompletedOnboarding(true)} />;
+            case FLOW.IMPORT_WALLET: return <ImportWallet onImportMnemonic={() => setFlowStep(FLOW.IMPORT_FROM_MNEMONIC)} onImportPrivateKey={() => setFlowStep(FLOW.IMPORT_FROM_PRIVATE_KEY)} onViewOnly={() => setFlowStep(FLOW.ADD_VIEW_ONLY_WALLET)} onBack={() => setFlowStep(FLOW.ONBOARDING)} />;
+            case FLOW.IMPORT_FROM_MNEMONIC: return <ImportFromMnemonic onMnemonicSubmit={handleMnemonicImportSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
+            case FLOW.IMPORT_FROM_PRIVATE_KEY: return <ImportFromPrivateKey onPrivateKeySubmit={handlePrivateKeyImportSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
+            case FLOW.ADD_VIEW_ONLY_WALLET: return <AddViewOnlyWallet onAddressSubmit={handleViewOnlyAddressSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
+            default: return <OnboardingCarousel onCreateWallet={() => setFlowStep(FLOW.CREATE_PASSCODE)} onAlreadyHaveWallet={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
         }
     };
 
@@ -254,10 +341,10 @@ function GatewayScreen() {
             </main>
             <AnimatePresence>
                 {showReceiveScreen && decryptedWallet && <ReceiveScreen wallet={{ address: getDisplayAddress() }} onClose={() => setShowReceiveScreen(false)} />}
-                {showSendScreen && decryptedWallet && <SendScreen userId={userId} sessionPasscode={sessionPasscode} onClose={() => setShowSendScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSendScreen(false); setShowConfirmScreen(true); }} ethBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}
-                {showSwapScreen && <SwapScreen onClose={() => setShowSwapScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSwapScreen(false); setShowConfirmScreen(true); }} nativeBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}
-                {showConfirmScreen && decryptedWallet && transactionDetails && <ConfirmTransactionScreen wallet={decryptedWallet} transaction={transactionDetails} onCancel={() => {setTransactionDetails(null); setShowConfirmScreen(false);}} onComplete={() => {setTransactionDetails(null); setShowConfirmScreen(false); fetchAllData();}} network={activeNetwork} />}
-                {showImportTokenModal && decryptedWallet && (
+                {showSendScreen && decryptedWallet && !isViewOnly && <SendScreen userId={userId} sessionPasscode={sessionPasscode} onClose={() => setShowSendScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSendScreen(false); setShowConfirmScreen(true); }} ethBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}
+                {showSwapScreen && !isViewOnly && <SwapScreen onClose={() => setShowSwapScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSwapScreen(false); setShowConfirmScreen(true); }} nativeBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}
+                {showConfirmScreen && decryptedWallet && transactionDetails && !isViewOnly && <ConfirmTransactionScreen wallet={decryptedWallet} transaction={transactionDetails} onCancel={() => {setTransactionDetails(null); setShowConfirmScreen(false);}} onComplete={() => {setTransactionDetails(null); setShowConfirmScreen(false); fetchAllData();}} network={activeNetwork} />}
+                {showImportTokenModal && decryptedWallet && !isViewOnly && (
                     <ImportToken 
                         onClose={() => setShowImportTokenModal(false)}
                         onTokenImported={handleTokenImported}

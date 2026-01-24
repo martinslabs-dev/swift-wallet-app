@@ -21,6 +21,7 @@ const MainDashboard = ({
     onSortChange,
     currentSort,
     onHideToken,
+    isViewOnly, // <-- New prop
 }) => {
     const [copied, setCopied] = useState(false);
 
@@ -71,7 +72,7 @@ const MainDashboard = ({
             </motion.div>
 
             <motion.div variants={itemVariants} className="mb-6">
-                <ActionButtons onSend={onSend} onReceive={onReceive} onSwap={onSwap} />
+                <ActionButtons onSend={onSend} onReceive={onReceive} onSwap={onSwap} isViewOnly={isViewOnly} />
             </motion.div>
 
             <motion.div variants={itemVariants}>
