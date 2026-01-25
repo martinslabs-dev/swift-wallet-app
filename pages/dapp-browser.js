@@ -1,13 +1,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import MainLayout from '../../components/layouts/MainLayout';
 import { FiArrowLeft, FiArrowRight, FiRefreshCw, FiExternalLink } from 'react-icons/fi';
-import ConnectionManager from '../../components/dapps/ConnectionManager';
-import { useDappConnection } from '../../context/DappConnectionContext';
-import { useWallet } from '../../context/WalletContext';
-import { useModal } from '../../context/ModalContext';
-import { signTransaction, signPersonalMessage, signTypedData } from '../../utils/wallet';
+import ConnectionManager from '../components/dapps/ConnectionManager';
+import { useDappConnection } from '../context/DappConnectionContext';
+import { useWallet } from '../context/WalletContext';
+import { useModal } from '../context/ModalContext';
+import { signTransaction, signPersonalMessage, signTypedData } from '../utils/wallet';
 
 const DappBrowserPage = () => {
     const router = useRouter();
@@ -141,25 +140,23 @@ const DappBrowserPage = () => {
     const openExternal = () => window.open(iframeUrl, '_blank');
 
     return (
-        <MainLayout>
-            <div className="flex flex-col h-screen text-white">
-                <div className="bg-gray-800 p-2 flex items-center justify-between space-x-4">
-                     <div className="flex items-center space-x-2">
-                        <button onClick={goBack}><FiArrowLeft /></button>
-                        <button onClick={goForward}><FiArrowRight /></button>
-                        <button onClick={refresh}><FiRefreshCw /></button>
-                    </div>
-                    <input type="text" value={iframeUrl} onChange={(e) => setIframeUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNavigation(e.target.value)} className="flex-grow bg-gray-900 px-4 py-2 rounded-full text-sm" placeholder="https://..." />
+        <div className="flex flex-col h-screen text-white">
+            <div className="bg-gray-800 p-2 flex items-center justify-between space-x-4">
                     <div className="flex items-center space-x-2">
-                        {iframeUrl && <ConnectionManager dappUrl={iframeUrl} />}
-                        <button onClick={openExternal}><FiExternalLink /></button>
-                    </div>
+                    <button onClick={goBack}><FiArrowLeft /></button>
+                    <button onClick={goForward}><FiArrowRight /></button>
+                    <button onClick={refresh}><FiRefreshCw /></button>
                 </div>
-                <div className="flex-grow relative bg-gray-900">
-                    {iframeUrl ? <iframe ref={iframeRef} src={iframeUrl} onLoad={handleIframeLoad} className="w-full h-full border-none absolute" title="Dapp Browser" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" /> : <div className="flex items-center justify-center h-full"><p className="text-gray-500">Enter a URL to start browsing.</p></div>}
+                <input type="text" value={iframeUrl} onChange={(e) => setIframeUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNavigation(e.target.value)} className="flex-grow bg-gray-900 px-4 py-2 rounded-full text-sm" placeholder="https://..." />
+                <div className="flex items-center space-x-2">
+                    {iframeUrl && <ConnectionManager dappUrl={iframeUrl} />}
+                    <button onClick={openExternal}><FiExternalLink /></button>
                 </div>
             </div>
-        </MainLayout>
+            <div className="flex-grow relative bg-gray-900">
+                {iframeUrl ? <iframe ref={iframeRef} src={iframeUrl} onLoad={handleIframeLoad} className="w-full h-full border-none absolute" title="Dapp Browser" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" /> : <div className="flex items-center justify-center h-full"><p className="text-gray-500">Enter a URL to start browsing.</p></div>}
+            </div>
+        </div>
     );
 };
 
