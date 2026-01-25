@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from 'next/router';
 import dynamic from "next/dynamic";
 import { AnimatePresence } from 'framer-motion';
-import { ethers } from "ethers";
+import { ethers, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
 
 // --- Context & Service Imports ---
 import { useNetwork } from "../context/NetworkContext";
@@ -45,7 +45,13 @@ import AccountsScreen from "../components/dashboard/AccountsScreen";
 
 // --- Util & Asset Imports ---
 import { storage } from "../utils/storage";
-import { deriveWalletFromMnemonic, deriveWalletFromPrivateKey, createViewOnlyWallet, reconstructWallet, deriveAccount } from "../utils/wallet";
+import { 
+    deriveWalletFromMnemonic, 
+    deriveWalletFromPrivateKey, 
+    createViewOnlyWallet, 
+    reconstructWallet, 
+    deriveAccount 
+} from "../utils/wallet";
 import { ERC20_ABI } from "../utils/tokens";
 import UsdtIcon from '../components/dashboard/icons/UsdtIcon';
 import UsdcIcon from '../components/dashboard/icons/UsdcIcon';
@@ -114,7 +120,7 @@ function GatewayScreen() {
     useEffect(() => {
         if (activeNetwork.rpcUrl) {
             try {
-                setEthersProvider(new ethers.JsonRpcProvider(activeNetwork.rpcUrl, undefined, { staticNetwork: true }));
+                setEthersProvider(new JsonRpcProvider(activeNetwork.rpcUrl, undefined, { staticNetwork: true }));
             } catch (e) { console.error("Failed to create ethers provider:", e); setEthersProvider(null); }
         }
     }, [activeNetwork]);
@@ -154,7 +160,7 @@ function GatewayScreen() {
                             try {
                                 const contract = new ethers.Contract(t.address, ERC20_ABI, ethersProvider);
                                 const balanceRaw = await contract.balanceOf(currentAccount.evm.address);
-                                const balance = ethers.formatUnits(balanceRaw, t.decimals);
+                                const balance = formatUnits(balanceRaw, t.decimals);
                                 return { ...t, balance, value_usd: '0.00', price_change_24h: 0 };
                             } catch { return { ...t, balance: '0', value_usd: '0.00', price_change_24h: 0 }; }
                         });
@@ -501,7 +507,7 @@ function GatewayScreen() {
     return (
         <div className="cosmic-background min-h-screen flex flex-col justify-center items-center font-sans text-center overflow-hidden">
             <main className="w-full h-full flex flex-col justify-center">
-                <AnimatePresence mode="wait">{renderContent()}</AnimatePresence>
+                <AnimatePresence mode="wait">{renderContent()}</AnPresence>
             </main>
             <AnimatePresence>
                 {showReceiveScreen && decryptedWallet && <ReceiveScreen wallet={{ address: getDisplayAddress() }} onClose={() => setShowReceiveScreen(false)} />}

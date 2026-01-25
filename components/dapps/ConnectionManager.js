@@ -1,12 +1,12 @@
 
-import { useDappConnection } from '../../context/DappConnectionContext';
-import { useWallet } from '../../context/WalletContext'; // Assuming you have a wallet context
-import { FiLink, FiUnlink } from 'react-icons/fi';
+import { FiLogOut, FiLink } from 'react-icons/fi';
 import { motion } from 'framer-motion';
+import { useDappConnection } from '../../context/DappConnectionContext';
+import { useWallet } from '../../context/WalletContext'; 
 
 const ConnectionManager = ({ dappUrl }) => {
     const { connect, disconnect, getConnection } = useDappConnection();
-    const { accounts } = useWallet(); // You'll need to get accounts from your wallet context
+    const { accounts } = useWallet(); 
     
     const origin = new URL(dappUrl).origin;
     const connection = getConnection(origin);
@@ -14,8 +14,6 @@ const ConnectionManager = ({ dappUrl }) => {
 
     const handleConnect = () => {
         if (accounts.length > 0) {
-            // For now, we'll connect with the first account.
-            // A real implementation would let the user choose.
             connect(origin, [accounts[0].address]);
         } else {
             alert("Please create or import a wallet first.");
@@ -36,7 +34,7 @@ const ConnectionManager = ({ dappUrl }) => {
             <span className="text-sm font-medium">{isConnected ? 'Connected' : 'Not Connected'}</span>
             {isConnected ? (
                 <button onClick={handleDisconnect} className="p-1 rounded-full hover:bg-gray-600">
-                    <FiUnlink />
+                    <FiLogOut />
                 </button>
             ) : (
                 <button onClick={handleConnect} className="p-1 rounded-full hover:bg-gray-600">
