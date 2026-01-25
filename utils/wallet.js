@@ -1,10 +1,79 @@
 
-import { ethers } from 'ethers';
+import { ethers, HDNodeWallet, Mnemonic, Wallet, JsonRpcProvider, keccak256, arrayify } from 'ethers';
 import { getStoredWallets } from './storage';
 
 // DISCLAIMER: This is a simplified example for demonstration purposes.
 // In a real-world application, private keys should be handled with extreme care,
 // preferably in a secure environment and never exposed in the front-end code.
+
+// --- New Functions ---
+
+const derivePath = "m/44'/60'/0'/0/";
+
+export const deriveWalletFromMnemonic = async (mnemonic) => {
+    const wallet = HDNodeWallet.fromMnemonic(Mnemonic.fromPhrase(mnemonic), `${derivePath}0`);
+    const newAccount = {
+        name: 'Account 1',
+        evm: { address: wallet.address, privateKey: wallet.privateKey },
+        solana: null, // Placeholder
+        bitcoin: null, // Placeholder
+    };
+    return {
+        mnemonic,
+        accounts: [newAccount],
+        activeAccountIndex: 0,
+        viewOnly: false,
+    };
+};
+
+export const deriveWalletFromPrivateKey = (privateKey, networkId) => {
+    try {
+        const wallet = new Wallet(privateKey);
+        const newAccount = {
+            name: 'Imported Account',
+            evm: { address: wallet.address, privateKey: wallet.privateKey },
+            solana: null,
+            bitcoin: null,
+        };
+        // This is a simplified version. A real app would handle different networkId properly.
+        return {
+            accounts: [newAccount],
+            activeAccountIndex: 0,
+            viewOnly: false,
+        };
+    } catch (e) {
+        console.error("Invalid private key", e);
+        return null;
+    }
+};
+
+export const createViewOnlyWallet = (address, networkId) => {
+    const newAccount = {
+        name: 'View-Only Account',
+        evm: { address: address, privateKey: null },
+        solana: null,
+        bitcoin: null,
+    };
+    // This is a simplified version. A real app would handle different networkId properly.
+    return {
+        accounts: [newAccount],
+        activeAccountIndex: 0,
+        viewOnly: true,
+    };
+};
+
+export const deriveAccount = async (mnemonic, index, name) => {
+    const wallet = HDNodeWallet.fromMnemonic(Mnemonic.fromPhrase(mnemonic), `${derivePath}${index}`);
+    return {
+        name: name || `Account ${index + 1}`,
+        evm: { address: wallet.address, privateKey: wallet.privateKey },
+        solana: null,
+        bitcoin: null,
+    };
+};
+
+
+// --- Existing Functions (with fixes) ---
 
 /**
  * Signs a transaction with a given private key.
@@ -15,15 +84,15 @@ import { getStoredWallets } from './storage';
 export const signTransaction = async (transaction, privateKey) => {
     // In a real wallet, you would connect to a provider here (e.g., Infura, Alchemy)
     // For this example, we'll use a mock provider.
-    const provider = new ethers.providers.JsonRpcProvider(); // Connects to localhost by default
-    const wallet = new ethers.Wallet(privateKey, provider);
+    const provider = new JsonRpcProvider(); // Connects to localhost by default
+    const wallet = new Wallet(privateKey, provider);
 
     // Ethers.js requires some fields to be set
     const tx = {
         ...transaction,
         gasLimit: transaction.gas || 21000, // Default gas limit
         gasPrice: transaction.gasPrice || await provider.getGasPrice(),
-        nonce: transaction.nonce || await wallet.getTransactionCount('latest'),
+        nonce: transaction.nonce || await wallet.getNonce('latest'),
     };
 
     // Remove nullish values that ethers doesn't like
@@ -34,7 +103,7 @@ export const signTransaction = async (transaction, privateKey) => {
         // In a real implementation, you would then send this transaction:
         // const txResponse = await provider.sendTransaction(signedTx);
         // For this demo, we'll just return the hash of the signed transaction (not the real tx hash)
-        return ethers.utils.keccak256(signedTx);
+        return keccak256(signedTx);
     } catch (error) {
         console.error("Error signing transaction:", error);
         throw error;
@@ -48,11 +117,12 @@ export const signTransaction = async (transaction, privateKey) => {
  * @returns {Promise<string>} The signature.
  */
 export const signPersonalMessage = async (message, privateKey) => {
-    const wallet = new ethers.Wallet(privateKey);
+    const wallet = new Wallet(privateKey);
     // For personal_sign, the message is often expected to be a hex string.
     // Ethers' signMessage handles this by converting the string to bytes.
     try {
-        const signature = await wallet.signMessage(ethers.utils.arrayify(message));
+        // The arrayify utility is now a top-level export
+        const signature = await wallet.signMessage(arrayify(message));
         return signature;
     } catch (error) {
         console.error("Error signing personal message:", error);
@@ -67,7 +137,7 @@ export const signPersonalMessage = async (message, privateKey) => {
  * @returns {Promise<string>} The signature.
  */
 export const signTypedData = async (data, privateKey) => {
-    const wallet = new ethers.Wallet(privateKey);
+    const wallet = new Wallet(privateKey);
     const { domain, types, message } = data;
 
     // Ethers requires the primaryType to be in the types object.
@@ -81,7 +151,7 @@ export const signTypedData = async (data, privateKey) => {
     delete allTypes.EIP712Domain;
 
     try {
-        const signature = await wallet._signTypedData(domain, allTypes, message);
+        const signature = await wallet.signTypedData(domain, allTypes, message);
         return signature;
     } catch (error) {
         console.error("Error signing typed data:", error);
@@ -95,7 +165,10 @@ export const getWallets = async () => {
 
 export const reconstructWallet = (walletData) => {
     if (walletData && walletData.privateKey && !walletData.viewOnly) {
-        const evmWallet = new ethers.Wallet(walletData.privateKey);
+        // The privateKey is already part of the walletData, we just need to reconstruct the ethers Wallet object if needed for operations.
+        // The logic in index.js seems to be handling the wallet object, so maybe this function is just for validation or adding computed properties.
+        // The original implementation created an `evmWallet` property, which I'll preserve.
+        const evmWallet = new Wallet(walletData.privateKey);
         return {
             ...walletData,
             evmWallet,

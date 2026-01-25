@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from 'next/router';
 import dynamic from "next/dynamic";
 import { AnimatePresence } from 'framer-motion';
-import { ethers, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
+import { Contract, JsonRpcProvider, formatUnits, Wallet } from "ethers";
 
 // --- Context & Service Imports ---
 import { useNetwork } from "../context/NetworkContext";
@@ -158,7 +158,7 @@ function GatewayScreen() {
                     if (customTokens.length > 0 && ethersProvider) {
                         const customTokenPromises = customTokens.map(async t => {
                             try {
-                                const contract = new ethers.Contract(t.address, ERC20_ABI, ethersProvider);
+                                const contract = new Contract(t.address, ERC20_ABI, ethersProvider);
                                 const balanceRaw = await contract.balanceOf(currentAccount.evm.address);
                                 const balance = formatUnits(balanceRaw, t.decimals);
                                 return { ...t, balance, value_usd: '0.00', price_change_24h: 0 };
@@ -225,7 +225,7 @@ function GatewayScreen() {
                 return;
             }
         } else {
-            const newMnemonic = ethers.Wallet.createRandom().mnemonic.phrase;
+            const newMnemonic = Wallet.createRandom().mnemonic.phrase;
             setMnemonic(newMnemonic);
             wallet = await deriveWalletFromMnemonic(newMnemonic);
         }
