@@ -42,6 +42,7 @@ import TransactionDetailModal from "../components/dashboard/TransactionDetailMod
 import TokenDetailModal from "../components/dashboard/TokenDetailModal";
 import BottomNavBar from "../components/dashboard/BottomNavBar";
 import AccountsScreen from "../components/dashboard/AccountsScreen";
+import BridgeScreen from "../components/dashboard/BridgeScreen";
 
 // --- Util & Asset Imports ---
 import { storage } from "../utils/storage";
@@ -401,6 +402,21 @@ function GatewayScreen() {
     };
 
     const handleTabChange = (tab) => {
+        // Close all modals
+        setShowReceiveScreen(false);
+        setShowSendScreen(false);
+        setShowSwapScreen(false);
+        setShowConfirmScreen(false);
+        setShowImportTokenModal(false);
+        setShowSeedPhrase(false);
+        setShowAddAccountScreen(false);
+        setShowExportPrivateKeyScreen(false);
+        setShowRenameAccountScreen(false);
+        setShowPasscodeConfirmation(false);
+        setSelectedTransaction(null);
+        setSelectedToken(null);
+        setAccountToRename(null)
+
         if (tab === 'dapps') {
             router.push('/dapps');
         } else {
@@ -461,6 +477,9 @@ function GatewayScreen() {
                         isViewOnly={isViewOnly}
                     />;
                     break;
+                case 'bridge':
+                    content = <BridgeScreen />;
+                    break;
                 case 'accounts':
                     content = <AccountsScreen />;
                     break;
@@ -496,7 +515,7 @@ function GatewayScreen() {
             case FLOW.SHOW_BACKUP_PHRASE: return <BackupPhrase phrase={mnemonic} onContinue={() => { if (decryptedWallet) { setFlowStep(FLOW.WALLET_READY); } else { setFlowStep(FLOW.VERIFY_BACKUP_PHRASE); } }} />;
             case FLOW.VERIFY_BACKUP_PHRASE: return <VerifyPhrase phrase={mnemonic} onVerified={handlePhraseVerified} />;
             case FLOW.WALLET_READY: return <WalletReady onContinue={() => { setHasCompletedOnboarding(true); setIsUnlocked(true); }} />;
-            case FLOW.IMPORT_WALLET: return <ImportWallet onImportMnemonic={() => setFlowStep(FLOW.IMPORT_FROM_MNEMONIC)} onImportPrivateKey={() => setFlowStep(FLOW.IMPORT_FROM_PRIVATE_KEY)} onViewOnly={() => setFlowStep(FLOW.ADD_VIEW_ONLY_WALLET)} onBack={() => setFlowStep(FLOW.ONBOARDING)} />;
+_C_IMPORT_WALLET: return <ImportWallet onImportMnemonic={() => setFlowStep(FLOW.IMPORT_FROM_MNEMONIC)} onImportPrivateKey={() => setFlowStep(FLOW.IMPORT_FROM_PRIVATE_KEY)} onViewOnly={() => setFlowStep(FLOW.ADD_VIEW_ONLY_WALLET)} onBack={() => setFlowStep(FLOW.ONBOARDING)} />;
             case FLOW.IMPORT_FROM_MNEMONIC: return <ImportFromMnemonic onMnemonicSubmit={handleMnemonicImportSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
             case FLOW.IMPORT_FROM_PRIVATE_KEY: return <ImportFromPrivateKey onPrivateKeySubmit={handlePrivateKeyImportSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
             case FLOW.ADD_VIEW_ONLY_WALLET: return <AddViewOnlyWallet onAddressSubmit={handleViewOnlyAddressSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;

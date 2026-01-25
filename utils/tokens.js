@@ -1,5 +1,4 @@
 
-import axios from 'axios';
 import { ethers } from 'ethers';
 
 // Minimal ERC-20 ABI for fetching balance, decimals, and name/symbol as a fallback
@@ -10,55 +9,46 @@ export const ERC20_ABI = [
     { "constant": true, "inputs": [], "name": "name", "outputs": [{ "name": "", "type": "string" }], "type": "function" }
 ];
 
-// In-memory cache for token lists to prevent redundant API calls
-const tokenListCache = {};
+const TOKEN_LISTS = {
+    1: 'https://tokens.coingecko.com/uniswap/all.json',
+    56: 'https://tokens.coingecko.com/binance-smart-chain/all.json',
+    137: 'https://tokens.coingecko.com/polygon-pos/all.json',
+    10: 'https://tokens.coingecko.com/optimistic-ethereum/all.json',
+    42161: 'https://tokens.coingecko.com/arbitrum-one/all.json',
+  };
 
 /**
- * Fetches a list of tokens for a given network from the 1inch API.
- * Implements in-memory caching and robust error handling.
+ * Fetches a list of tokens for a given network chain ID from a predefined token list URL.
  * @param {number} chainId - The chain ID of the network.
  * @returns {Promise<Array>} - A promise that resolves to an array of token objects.
  */
 export const fetchTokensForNetwork = async (chainId) => {
-    if (!chainId) {
-        console.warn('No chainId provided to fetchTokensForNetwork');
+    const url = TOKEN_LISTS[chainId];
+    if (!url) {
+        console.warn(`No token list found for chainId: ${chainId}`);
         return [];
-    }
-
-    // Return from cache if available
-    if (tokenListCache[chainId]) {
-        return tokenListCache[chainId];
     }
 
     try {
-        const url = `https://tokens.1inch.io/v1.2/${chainId}`;
-        const response = await axios.get(url);
-
-        // Guard against cases where the API returns a 200 OK but no token data
-        if (response.data && response.data.tokens) {
-            const tokens = Object.values(response.data.tokens);
-            tokenListCache[chainId] = tokens;
-            console.log(`Fetched and cached ${tokens.length} tokens for chainId ${chainId}.`);
-            return tokens;
-        } else {
-            console.warn(`No token data returned from 1inch for chainId ${chainId}.`);
-            tokenListCache[chainId] = []; // Cache the empty result
-            return [];
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch token list: ${response.statusText}`);
         }
+        const data = await response.json();
+        
+        // The token list format might have the tokens nested under a `tokens` key
+        const tokens = data.tokens || data;
+        if (!Array.isArray(tokens)) {
+            throw new Error('Token list format is invalid');
+        }
+
+        return tokens.map(token => ({ ...token, coingeckoId: token.id }));
     } catch (error) {
-        // Handle specific Axios 400 errors gracefully
-        if (error.response && error.response.status === 400) {
-            console.warn(`1inch API returned a 400 Bad Request for chainId ${chainId}. This network may not be supported. Proceeding with an empty token list.`);
-        } else {
-            // Log other errors more verbosely
-            console.error(`An unexpected error occurred while fetching the token list for chainId ${chainId}:`, error);
-        }
-
-        // For any error, cache the empty result to prevent repeated failures
-        tokenListCache[chainId] = [];
+        console.error(`Error fetching token list for chainId ${chainId}:`, error);
         return [];
     }
 };
+
 
 /**
  * Fetches the details of a specific token by its contract address.

@@ -1,6 +1,7 @@
 
 import { motion } from 'framer-motion';
 import WalletIcon from './icons/WalletIcon';
+import BridgeIcon from './icons/BridgeIcon';
 import GlobeIcon from './icons/GlobeIcon';
 import UsersIcon from './icons/UsersIcon';
 import CogIcon from './icons/CogIcon';
@@ -29,6 +30,7 @@ const NavItem = ({ icon: Icon, label, isActive, onClick }) => {
 const BottomNavBar = ({ activeTab, onTabChange }) => {
     const navItems = [
         { id: 'wallet', label: 'Wallet', icon: WalletIcon },
+        { id: 'bridge', label: 'Bridge', icon: BridgeIcon },
         { id: 'dapps', label: 'dApps', icon: GlobeIcon },
         { id: 'accounts', label: 'Accounts', icon: UsersIcon },
         { id: 'settings', label: 'Settings', icon: CogIcon },
