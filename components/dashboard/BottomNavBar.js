@@ -1,0 +1,59 @@
+
+import { motion } from 'framer-motion';
+import WalletIcon from './icons/WalletIcon';
+import GlobeIcon from './icons/GlobeIcon';
+import UsersIcon from './icons/UsersIcon';
+import CogIcon from './icons/CogIcon';
+
+const NavItem = ({ icon: Icon, label, isActive, onClick }) => {
+    return (
+        <motion.button 
+            onClick={onClick} 
+            className="flex flex-col items-center justify-center w-full h-full relative text-gray-400 focus:outline-none" 
+            whileTap={{ scale: 0.9 }}
+        >
+            <Icon className={`w-6 h-6 transition-colors duration-300 ${isActive ? 'text-cyan-400' : ''}`} />
+            <span className={`text-xs mt-1 transition-colors duration-300 ${isActive ? 'text-cyan-400' : ''}`}>
+                {label}
+            </span>
+            {isActive && (
+                <motion.div 
+                    className="absolute -top-1 w-8 h-1 bg-cyan-400 rounded-full"
+                    layoutId="active-indicator"
+                />
+            )}
+        </motion.button>
+    );
+};
+
+const BottomNavBar = ({ activeTab, onTabChange }) => {
+    const navItems = [
+        { id: 'wallet', label: 'Wallet', icon: WalletIcon },
+        { id: 'dapps', label: 'dApps', icon: GlobeIcon },
+        { id: 'accounts', label: 'Accounts', icon: UsersIcon },
+        { id: 'settings', label: 'Settings', icon: CogIcon },
+    ];
+
+    return (
+        <motion.div 
+            className="fixed bottom-0 left-0 right-0 h-20 bg-gray-900/80 backdrop-blur-md z-50"
+            initial={{ y: 100 }}
+            animate={{ y: 0 }}
+            transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+        >
+            <div className="w-full h-full max-w-md mx-auto flex justify-around items-center">
+                {navItems.map(item => (
+                    <NavItem 
+                        key={item.id}
+                        icon={item.icon}
+                        label={item.label}
+                        isActive={activeTab === item.id}
+                        onClick={() => onTabChange(item.id)}
+                    />
+                ))}
+            </div>
+        </motion.div>
+    );
+};
+
+export default BottomNavBar;

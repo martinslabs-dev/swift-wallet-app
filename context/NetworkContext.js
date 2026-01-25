@@ -5,7 +5,7 @@ import { NETWORKS } from '../utils/networks';
 const NetworkContext = createContext();
 
 export const NetworkProvider = ({ children }) => {
-    const [activeNetwork, setActiveNetwork] = useState(NETWORKS.sepolia);
+    const [activeNetwork, setActiveNetwork] = useState(NETWORKS.all);
 
     const switchNetwork = (networkId) => {
         const newNetwork = NETWORKS[networkId];

@@ -2,6 +2,16 @@
 import * as bitcoin from 'bitcoinjs-lib';
 
 export const NETWORKS = {
+    all: {
+        id: 'all',
+        name: 'All Networks',
+        chainType: 'all',
+        rpcUrl: null,
+        explorerUrl: null,
+        currencySymbol: null,
+        etherscanApiUrl: null,
+        type: 'all',
+    },
     mainnet: {
         id: 'mainnet',
         name: 'Ethereum',
@@ -11,6 +21,7 @@ export const NETWORKS = {
         explorerUrl: 'https://etherscan.io',
         currencySymbol: 'ETH',
         etherscanApiUrl: 'https://api.etherscan.io/api',
+        type: 'mainnet',
     },
     sepolia: {
         id: 'sepolia',
@@ -21,6 +32,7 @@ export const NETWORKS = {
         explorerUrl: 'https://sepolia.etherscan.io',
         currencySymbol: 'SepoliaETH',
         etherscanApiUrl: 'https://api-sepolia.etherscan.io/api',
+        type: 'testnet',
     },
     polygon: {
         id: 'polygon',
@@ -31,6 +43,7 @@ export const NETWORKS = {
         explorerUrl: 'https://polygonscan.com',
         currencySymbol: 'MATIC',
         etherscanApiUrl: 'https://api.polygonscan.com/api',
+        type: 'mainnet',
     },
     arbitrum: {
         id: 'arbitrum',
@@ -41,6 +54,7 @@ export const NETWORKS = {
         explorerUrl: 'https://arbiscan.io',
         currencySymbol: 'ETH',
         etherscanApiUrl: 'https://api.arbiscan.io/api',
+        type: 'mainnet',
     },
     bsc: {
         id: 'bsc',
@@ -51,6 +65,7 @@ export const NETWORKS = {
         explorerUrl: 'https://bscscan.com',
         currencySymbol: 'BNB',
         etherscanApiUrl: 'https://api.bscscan.com/api',
+        type: 'mainnet',
     },
     avalanche: {
         id: 'avalanche',
@@ -61,6 +76,7 @@ export const NETWORKS = {
         explorerUrl: 'https://snowtrace.io',
         currencySymbol: 'AVAX',
         etherscanApiUrl: 'https://api.snowtrace.io/api',
+        type: 'mainnet',
     },
     solana: {
         id: 'solana',
@@ -70,6 +86,7 @@ export const NETWORKS = {
         explorerUrl: 'https://explorer.solana.com',
         currencySymbol: 'SOL',
         etherscanApiUrl: null, // Solana uses a different API structure
+        type: 'mainnet',
     },
     bitcoin: {
         id: 'bitcoin',
@@ -80,6 +97,7 @@ export const NETWORKS = {
         currencySymbol: 'BTC',
         etherscanApiUrl: 'https://mempool.space/api', // For UTXOs, fees, etc.
         bitcoinjslib_network: bitcoin.networks.bitcoin,
+        type: 'mainnet',
     },
     bitcoin_testnet: {
         id: 'bitcoin_testnet',
@@ -90,5 +108,6 @@ export const NETWORKS = {
         currencySymbol: 'tBTC',
         etherscanApiUrl: 'https://mempool.space/testnet/api',
         bitcoinjslib_network: bitcoin.networks.testnet,
+        type: 'testnet',
     }
 };

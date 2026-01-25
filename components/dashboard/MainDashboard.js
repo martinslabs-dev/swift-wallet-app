@@ -1,9 +1,23 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FiCopy, FiCheckCircle } from 'react-icons/fi';
-import ActionButtons from './ActionButtons';
+import { FiCopy, FiCheckCircle, FiArrowUp, FiArrowDown, FiRepeat } from 'react-icons/fi';
 import AssetTabs from './AssetTabs';
+
+const ActionButton = ({ icon: Icon, label, onClick, disabled }) => (
+    <motion.button
+        onClick={onClick}
+        disabled={disabled}
+        className="flex flex-col items-center justify-center space-y-2 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+    >
+        <div className="p-4 bg-slate-800/80 rounded-full ring-1 ring-slate-700/80 group-hover:ring-cyan-400/80 transition-all duration-300">
+            <Icon className="w-6 h-6 theme-gradient-text" />
+        </div>
+        <span>{label}</span>
+    </motion.button>
+);
 
 const MainDashboard = ({
     wallet,
@@ -16,12 +30,13 @@ const MainDashboard = ({
     onReceive,
     onSwap,
     onImportToken,
+    onTransactionClick,
     onTokenClick,
     network,
     onSortChange,
     currentSort,
     onHideToken,
-    isViewOnly, // <-- New prop
+    isViewOnly,
 }) => {
     const [copied, setCopied] = useState(false);
 
@@ -71,8 +86,10 @@ const MainDashboard = ({
                 </div>
             </motion.div>
 
-            <motion.div variants={itemVariants} className="mb-6">
-                <ActionButtons onSend={onSend} onReceive={onReceive} onSwap={onSwap} isViewOnly={isViewOnly} />
+            <motion.div variants={itemVariants} className="grid grid-cols-3 gap-4 mb-6">
+                <ActionButton icon={FiArrowUp} label="Send" onClick={onSend} disabled={isViewOnly} />
+                <ActionButton icon={FiArrowDown} label="Receive" onClick={onReceive} />
+                <ActionButton icon={FiRepeat} label="Swap" onClick={onSwap} disabled={isViewOnly} />
             </motion.div>
 
             <motion.div variants={itemVariants}>
@@ -80,6 +97,7 @@ const MainDashboard = ({
                     tokens={tokenBalances}
                     transactions={transactions}
                     onTokenClick={onTokenClick}
+                    onTransactionClick={onTransactionClick}
                     onImportToken={onImportToken}
                     network={network}
                     onSortChange={onSortChange}

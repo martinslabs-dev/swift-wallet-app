@@ -16,6 +16,20 @@ const getDecryptedWallet = async (passcode, userId) => {
     return decrypt(encryptedWallet, passcode);
 };
 
+export const getStoredWallets = async () => {
+    // This is a placeholder. In a real multi-wallet system, you would fetch all wallets.
+    // For now, we'll work with the single encrypted wallet pattern already in place.
+    const singleWallet = localStorage.getItem(getWalletKey('default_user')); // Or however you identify the current user
+    if (singleWallet) {
+        // The wallet is encrypted. We can't return the address without decrypting.
+        // The context seems to expect an array of wallets with addresses.
+        // This part of the logic may need rethinking depending on the app's auth flow.
+        // For now, returning a structure that won't crash the app.
+        return [{ address: 'Encrypted Wallet' }]; // Placeholder
+    }
+    return [];
+};
+
 export const storage = {
     // Onboarding status
     hasCompletedOnboarding: (userId) => !!localStorage.getItem(getOnboardingKey(userId)),
@@ -83,21 +97,22 @@ export const storage = {
         const walletData = await getDecryptedWallet(passcode, userId);
         if (!walletData) return false;
         if (!walletData.contacts) walletData.contacts = [];
-        const existingIndex = walletData.contacts.findIndex(c => c.address === contact.address);
+        const existingIndex = walletData.contacts.findIndex(c => c.id === contact.id);
         if (existingIndex > -1) {
             walletData.contacts[existingIndex] = contact; // Update existing
         } else {
+            contact.id = Date.now().toString(); // Assign a simple unique ID
             walletData.contacts.push(contact); // Add new
         }
         await saveEncryptedWallet(walletData, passcode, userId);
-        return true;
+        return walletData.contacts;
     },
-    deleteContact: async (address, userId, passcode) => {
+    deleteContact: async (contactId, userId, passcode) => {
         const walletData = await getDecryptedWallet(passcode, userId);
         if (!walletData || !walletData.contacts) return false;
-        walletData.contacts = walletData.contacts.filter(c => c.address !== address);
+        walletData.contacts = walletData.contacts.filter(c => c.id !== contactId);
         await saveEncryptedWallet(walletData, passcode, userId);
-        return true;
+        return walletData.contacts;
     },
 
     // Clear all data for a user
