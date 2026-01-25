@@ -507,7 +507,7 @@ function GatewayScreen() {
     return (
         <div className="cosmic-background min-h-screen flex flex-col justify-center items-center font-sans text-center overflow-hidden">
             <main className="w-full h-full flex flex-col justify-center">
-                <AnimatePresence mode="wait">{renderContent()}</AnPresence>
+                <AnimatePresence mode="wait">{renderContent()}</AnimatePresence>
             </main>
             <AnimatePresence>
                 {showReceiveScreen && decryptedWallet && <ReceiveScreen wallet={{ address: getDisplayAddress() }} onClose={() => setShowReceiveScreen(false)} />}
