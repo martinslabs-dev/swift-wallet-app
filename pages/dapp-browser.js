@@ -3,12 +3,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { FiArrowLeft, FiArrowRight, FiRefreshCw, FiExternalLink } from 'react-icons/fi';
 import ConnectionManager from '../components/dapps/ConnectionManager';
-import { useDappConnection } from '../context/DappConnectionContext';
+import { DappConnectionProvider, useDappConnection } from '../context/DappConnectionContext';
 import { useWallet } from '../context/WalletContext';
 import { useModal } from '../context/ModalContext';
 import { signTransaction, signPersonalMessage, signTypedData } from '../utils/wallet';
 
-const DappBrowserPage = () => {
+const DappBrowser = () => {
     const router = useRouter();
     const { url } = router.query;
     const [iframeUrl, setIframeUrl] = useState('');
@@ -159,5 +159,11 @@ const DappBrowserPage = () => {
         </div>
     );
 };
+
+const DappBrowserPage = () => (
+    <DappConnectionProvider>
+        <DappBrowser />
+    </DappConnectionProvider>
+);
 
 export default DappBrowserPage;

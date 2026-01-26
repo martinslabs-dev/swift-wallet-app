@@ -80,7 +80,7 @@ const ResetConfirmation = ({ onConfirm, onCancel, show }) => {
                         <div className="relative z-10">
                             <AnimatedWarningIcon />
                             <motion.h2 
-                                className="text-3xl font-bold text-white mt-6 mb-4"
+                                className="text-3xl font-bold mt-6 mb-4 theme-gradient-text"
                                 initial={{ y: 20, opacity: 0}} 
                                 animate={{ y: 0, opacity: 1, transition: { delay: 0.4 }}}
                             >

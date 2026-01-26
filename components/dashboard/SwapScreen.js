@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiChevronDown, FiArrowDown, FiLoader } from 'react-icons/fi';
-import { ethers } from 'ethers';
+import { FiX, FiChevronDown, FiArrowDown } from 'react-icons/fi';
+import { parseUnits, formatUnits } from 'ethers';
 import debounce from 'lodash.debounce';
-import { relayService } from '../../services/relayService'; // Use our unified service
-import { useNetwork } from '../../context/NetworkContext'; // Use network context
+import { lifiService } from '../../services/lifiService';
 
-
-const SwapScreen = ({ onClose, onConfirm, tokenBalances, icons }) => {
-    const { activeNetwork } = useNetwork();
-    
+const SwapScreen = ({ onClose, onConfirm, tokenBalances, network, activeAccount }) => {
     const [fromAmount, setFromAmount] = useState('');
     const [toAmount, setToAmount] = useState('');
     const [fromToken, setFromToken] = useState(null);
@@ -24,13 +20,14 @@ const SwapScreen = ({ onClose, onConfirm, tokenBalances, icons }) => {
 
     const allAssets = useMemo(() => {
         const nativeAsset = {
-            symbol: activeNetwork.currencySymbol,
-            name: activeNetwork.name,
-            address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', 
+            symbol: network.currencySymbol,
+            name: network.name,
+            address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
             decimals: 18, 
+            balance: '0' // This will be replaced by actual balance later
         };
         return [nativeAsset, ...tokenBalances];
-    }, [activeNetwork, tokenBalances]);
+    }, [network, tokenBalances]);
 
     useEffect(() => {
         if (!fromToken && allAssets.length > 0) {
@@ -39,7 +36,7 @@ const SwapScreen = ({ onClose, onConfirm, tokenBalances, icons }) => {
     }, [allAssets, fromToken]);
 
     const getSwapQuote = async (amount) => {
-        if (!fromToken || !toToken || !amount || parseFloat(amount) <= 0) {
+        if (!fromToken || !toToken || !amount || parseFloat(amount) <= 0 || !activeAccount) {
             setToAmount('');
             setQuote(null);
             return;
@@ -49,22 +46,29 @@ const SwapScreen = ({ onClose, onConfirm, tokenBalances, icons }) => {
         setError('');
 
         try {
+            const amountInSmallestUnit = parseUnits(amount, fromToken.decimals).toString();
+
             const quoteParams = {
-                fromChain: activeNetwork.chainId,
-                toChain: activeNetwork.chainId,
-                fromToken: fromToken.address,
-                toToken: toToken.address,
-                amount: amount, 
-                userAddress: '0xUSER_ADDRESS', 
+                fromChain: network.chainId,
+                toChain: network.chainId,
+                fromToken: fromToken.address === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' ? network.currencySymbol : fromToken.address,
+                toToken: toToken.address === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' ? network.currencySymbol : toToken.address,
+                fromAmount: amountInSmallestUnit,
+                fromAddress: activeAccount.evm.address,
             };
 
-            const quoteResult = await relayService.getQuote(quoteParams);
+            const quoteResult = await lifiService.getQuote(quoteParams);
 
-            setToAmount(quoteResult.toAmount);
+            if (quoteResult.estimate && quoteResult.estimate.toAmount) {
+                const formattedToAmount = formatUnits(quoteResult.estimate.toAmount, toToken.decimals);
+                setToAmount(formattedToAmount);
+            } else {
+                setToAmount('0');
+            }
             setQuote(quoteResult);
-        
+
         } catch (err) {
-            console.error("Relay.link quote error:", err);
+            console.error("LI.FI quote error:", err);
             setError(err.message || "Could not fetch a quote.");
             setToAmount('');
             setQuote(null);
@@ -73,7 +77,7 @@ const SwapScreen = ({ onClose, onConfirm, tokenBalances, icons }) => {
         }
     };
 
-    const debouncedGetQuote = useCallback(debounce(getSwapQuote, 500), [fromToken, toToken, activeNetwork.chainId]);
+    const debouncedGetQuote = useCallback(debounce(getSwapQuote, 500), [fromToken, toToken, network.chainId, activeAccount]);
 
     useEffect(() => {
         debouncedGetQuote(fromAmount);
@@ -102,20 +106,20 @@ const SwapScreen = ({ onClose, onConfirm, tokenBalances, icons }) => {
     };
 
     const handleSwap = () => {
-        if (!quote || !fromToken || error) return;
+        if (!quote || !quote.transactionRequest || !fromToken || error) return;
         
         const txDetails = {
             toAddress: quote.transactionRequest.to,
             amount: fromAmount,
             asset: fromToken,
-            data: quote.transactionRequest.data, 
+            data: quote.transactionRequest.data,
             value: quote.transactionRequest.value,
             isSwap: true,
         };
         onConfirm(txDetails);
     };
 
-    const isButtonDisabled = isLoading || !quote || !!error || parseFloat(fromAmount) <= 0;
+    const isButtonDisabled = isLoading || !quote || !quote.transactionRequest || !!error || parseFloat(fromAmount) <= 0;
 
     return (
         <motion.div
@@ -128,7 +132,7 @@ const SwapScreen = ({ onClose, onConfirm, tokenBalances, icons }) => {
              <div className="w-full max-w-md">
                 <div className="w-full max-w-md p-4 rounded-t-lg">
                     <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-white">Swap</h2>
+                        <h2 className="text-2xl font-bold theme-gradient-text">Swap</h2>
                         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 transition-colors">
                             <FiX size={24} />
                         </button>
@@ -207,7 +211,7 @@ const TokenSelector = ({ isOpen, onClose, tokens, onSelectToken }) => (
         className="absolute inset-0 bg-gray-900 p-4"
     >
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Select Token</h2>
+            <h2 className="text-2xl font-bold theme-gradient-text">Select Token</h2>
             <button onClick={onClose}><FiX size={24} /></button>
         </div>
         <div className="flex flex-col gap-2">

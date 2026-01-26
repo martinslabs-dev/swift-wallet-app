@@ -1,123 +1,156 @@
 
-import { encrypt, decrypt } from './crypto';
+import { AES, enc } from 'crypto-js';
 
-const getOnboardingKey = (userId) => `hasCompletedOnboarding_${userId}`;
-const getWalletKey = (userId) => `encryptedWallet_${userId}`;
+const getMasterKey = (passcode, salt) => `${passcode}:${salt}`;
 
-// Core wallet functions
+// --- Wallet Data ---
+const getEncryptedWallet = (userId) => localStorage.getItem(`wallet_${userId}`);
+
 const saveEncryptedWallet = async (walletData, passcode, userId) => {
-    const encryptedWallet = await encrypt(walletData, passcode);
-    localStorage.setItem(getWalletKey(userId), encryptedWallet);
+    // New format: salt is stored alongside the data, not within it.
+    const salt = new Date().toISOString();
+    const masterKey = getMasterKey(passcode, salt);
+    const encryptedData = AES.encrypt(JSON.stringify(walletData), masterKey).toString();
+    
+    const dataToStore = JSON.stringify({
+        salt: salt,
+        data: encryptedData
+    });
+
+    localStorage.setItem(`wallet_${userId}`, dataToStore);
 };
 
 const getDecryptedWallet = async (passcode, userId) => {
-    const encryptedWallet = localStorage.getItem(getWalletKey(userId));
-    if (!encryptedWallet) return null;
-    return decrypt(encryptedWallet, passcode);
+    const storedItem = getEncryptedWallet(userId);
+    if (!storedItem) return null;
+
+    // --- Priority 1: Try the new format (JSON object with salt and data) ---
+    let parsedStoredData;
+    try {
+        parsedStoredData = JSON.parse(storedItem);
+    } catch (e) {
+        // It's not a JSON object, so it must be the old, raw encrypted format.
+        // We'll proceed to the fallback logic below.
+    }
+
+    if (parsedStoredData && parsedStoredData.salt && parsedStoredData.data) {
+        try {
+            const masterKey = getMasterKey(passcode, parsedStoredData.salt);
+            const decryptedBytes = AES.decrypt(parsedStoredData.data, masterKey);
+            const decryptedString = decryptedBytes.toString(enc.Utf8);
+
+            // If decryption fails, decryptedString will be empty, and JSON.parse will throw an error.
+            // This is our primary validation check.
+            const walletData = JSON.parse(decryptedString);
+            return walletData; // SUCCESS with new format
+
+        } catch (e) {
+            // Decryption with new format failed. This is the expected path for a wrong password.
+            return null;
+        }
+    }
+
+    // --- Priority 2: Fallback for the old, unsalted format ---
+    try {
+        const decryptedBytes = AES.decrypt(storedItem, passcode);
+        const decryptedString = decryptedBytes.toString(enc.Utf8);
+
+        // The same validation applies here. If decryption fails, this will throw.
+        const walletData = JSON.parse(decryptedString);
+
+        // If we successfully decrypt, it's a valid old-format wallet. 
+        // We should immediately upgrade it to the new, more secure format.
+        await saveEncryptedWallet(walletData, passcode, userId);
+        return walletData; // SUCCESS with old format
+
+    } catch (e) {
+        // If we reach here, it means the data was not in the new format, and it also failed
+        // to decrypt as the old format. This is a definitive failure.
+        console.error("Decryption failed for all known formats. Incorrect password or corrupted data.");
+        return null;
+    }
 };
 
-export const getStoredWallets = async () => {
-    // This is a placeholder. In a real multi-wallet system, you would fetch all wallets.
-    // For now, we'll work with the single encrypted wallet pattern already in place.
-    const singleWallet = localStorage.getItem(getWalletKey('default_user')); // Or however you identify the current user
-    if (singleWallet) {
-        // The wallet is encrypted. We can't return the address without decrypting.
-        // The context seems to expect an array of wallets with addresses.
-        // This part of the logic may need rethinking depending on the app's auth flow.
-        // For now, returning a structure that won't crash the app.
-        return [{ address: 'Encrypted Wallet' }]; // Placeholder
+
+
+// --- Custom Tokens ---
+const getCustomTokensKey = (chainId, userId) => `custom_tokens_${chainId}_${userId}`;
+const getCustomTokens = async (chainId, userId, passcode) => {
+    const key = getCustomTokensKey(chainId, userId);
+    const encryptedTokens = localStorage.getItem(key);
+    if (!encryptedTokens) return [];
+    try {
+        const decrypted = AES.decrypt(encryptedTokens, passcode).toString(enc.Utf8);
+        return JSON.parse(decrypted);
+    } catch (e) {
+        return [];
     }
-    return [];
+};
+const addCustomToken = async (token, chainId, userId, passcode) => {
+    const tokens = await getCustomTokens(chainId, userId, passcode);
+    if (!tokens.find(t => t.address.toLowerCase() === token.address.toLowerCase())) {
+        tokens.push(token);
+        const key = getCustomTokensKey(chainId, userId);
+        const encrypted = AES.encrypt(JSON.stringify(tokens), passcode).toString();
+        localStorage.setItem(key, encrypted);
+    }
+};
+
+// --- Hidden Tokens ---
+const getHiddenTokensKey = (chainId, userId) => `hidden_tokens_${chainId}_${userId}`;
+const getHiddenTokens = async (chainId, userId, passcode) => {
+    const key = getHiddenTokensKey(chainId, userId);
+    const encrypted = localStorage.getItem(key);
+    if (!encrypted) return [];
+    try {
+        return JSON.parse(AES.decrypt(encrypted, passcode).toString(enc.Utf8));
+    } catch (e) { return []; }
+};
+const setHiddenTokens = async (tokens, chainId, userId, passcode) => {
+    const key = getHiddenTokensKey(chainId, userId);
+    const encrypted = AES.encrypt(JSON.stringify(tokens), passcode).toString();
+    localStorage.setItem(key, encrypted);
+};
+
+// --- Sort Preference ---
+const getSortPreferenceKey = (userId) => `sort_pref_${userId}`;
+const getSortPreference = async (userId, passcode) => {
+    const key = getSortPreferenceKey(userId);
+    const encrypted = localStorage.getItem(key);
+    if (!encrypted) return 'default';
+    try {
+        return AES.decrypt(encrypted, passcode).toString(enc.Utf8);
+    } catch { return 'default'; }
+};
+const setSortPreference = async (sort, userId, passcode) => {
+    const key = getSortPreferenceKey(userId);
+    const encrypted = AES.encrypt(sort, passcode).toString();
+    localStorage.setItem(key, encrypted);
+};
+
+// --- Generic & Control ---
+const hasCompletedOnboarding = (userId) => localStorage.getItem(`onboarded_${userId}`) === 'true';
+const setHasCompletedOnboarding = (userId) => localStorage.setItem(`onboarded_${userId}`, 'true');
+const clearAllData = (userId) => {
+    Object.keys(localStorage).forEach(key => {
+        if (key.endsWith(`_${userId}`)) {
+            localStorage.removeItem(key);
+        }
+    });
+    localStorage.removeItem(`onboarded_${userId}`); // Also clear onboarding status
 };
 
 export const storage = {
-    // Onboarding status
-    hasCompletedOnboarding: (userId) => !!localStorage.getItem(getOnboardingKey(userId)),
-    setHasCompletedOnboarding: (userId) => localStorage.setItem(getOnboardingKey(userId), 'true'),
-
-    // Encrypted Wallet
+    getEncryptedWallet,
     saveEncryptedWallet,
     getDecryptedWallet,
-
-    // Custom Token Management
-    addCustomToken: async (token, chainId, userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        if (!walletData) { return false; }
-        if (!walletData.customTokens) walletData.customTokens = {};
-        if (!walletData.customTokens[chainId]) walletData.customTokens[chainId] = [];
-        const tokenExists = walletData.customTokens[chainId].some(t => t.address.toLowerCase() === token.address.toLowerCase());
-        if (tokenExists) { return true; }
-        walletData.customTokens[chainId].push(token);
-        await saveEncryptedWallet(walletData, passcode, userId);
-        return true;
-    },
-    getCustomTokens: async (chainId, userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        return walletData?.customTokens?.[chainId] || [];
-    },
-
-    // Token Hiding
-    hideToken: async (tokenAddress, chainId, userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        if (!walletData) { return false; }
-        if (!walletData.hiddenTokens) walletData.hiddenTokens = {};
-        if (!walletData.hiddenTokens[chainId]) walletData.hiddenTokens[chainId] = [];
-        const lowerCaseAddress = tokenAddress.toLowerCase();
-        if (!walletData.hiddenTokens[chainId].includes(lowerCaseAddress)) {
-            walletData.hiddenTokens[chainId].push(lowerCaseAddress);
-            await saveEncryptedWallet(walletData, passcode, userId);
-        }
-        return true;
-    },
-    getHiddenTokens: async (chainId, userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        return walletData?.hiddenTokens?.[chainId] || [];
-    },
-
-    // Sorting Preferences
-    setSortPreference: async (preference, userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        if (!walletData) { return false; }
-        if (!walletData.preferences) walletData.preferences = {};
-        walletData.preferences.sort = preference;
-        await saveEncryptedWallet(walletData, passcode, userId);
-        return true;
-    },
-    getSortPreference: async (userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        return walletData?.preferences?.sort || 'default'; // Default sort order
-    },
-    
-    // Contact Management
-    getContacts: async (userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        return walletData?.contacts || [];
-    },
-    saveContact: async (contact, userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        if (!walletData) return false;
-        if (!walletData.contacts) walletData.contacts = [];
-        const existingIndex = walletData.contacts.findIndex(c => c.id === contact.id);
-        if (existingIndex > -1) {
-            walletData.contacts[existingIndex] = contact; // Update existing
-        } else {
-            contact.id = Date.now().toString(); // Assign a simple unique ID
-            walletData.contacts.push(contact); // Add new
-        }
-        await saveEncryptedWallet(walletData, passcode, userId);
-        return walletData.contacts;
-    },
-    deleteContact: async (contactId, userId, passcode) => {
-        const walletData = await getDecryptedWallet(passcode, userId);
-        if (!walletData || !walletData.contacts) return false;
-        walletData.contacts = walletData.contacts.filter(c => c.id !== contactId);
-        await saveEncryptedWallet(walletData, passcode, userId);
-        return walletData.contacts;
-    },
-
-    // Clear all data for a user
-    clearAllData: (userId) => {
-        localStorage.removeItem(getOnboardingKey(userId));
-        localStorage.removeItem(getWalletKey(userId));
-    }
+    hasCompletedOnboarding,
+    setHasCompletedOnboarding,
+    getCustomTokens,
+    addCustomToken,
+    getHiddenTokens,
+    setHiddenTokens, 
+    getSortPreference,
+    setSortPreference,
+    clearAllData,
 };

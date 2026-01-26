@@ -1,29 +1,42 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getWallets } from '../utils/wallet'; 
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { storage } from '../utils/storage';
 
 const WalletContext = createContext(null);
 
 export const WalletProvider = ({ children }) => {
-    const [accounts, setAccounts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [decryptedWallet, setDecryptedWallet] = useState(null);
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [sessionPasscode, setSessionPasscode] = useState(null);
+    const [userId, setUserId] = useState(null);
 
-    useEffect(() => {
-        const loadWallets = async () => {
-            try {
-                const wallets = await getWallets();
-                // Assuming getWallets returns an array of wallet objects with an address property
-                setAccounts(wallets.map(w => ({ address: w.address, ...w })));
-            } catch (error) {
-                console.error("Failed to load wallets:", error);
-            }
-            setLoading(false);
-        };
+    const unlock = async (passcode, userId) => {
+        const walletData = await storage.getDecryptedWallet(passcode, userId);
+        if (walletData) {
+            setDecryptedWallet(walletData);
+            setSessionPasscode(passcode);
+            setIsUnlocked(true);
+            return true;
+        }
+        return false;
+    };
 
-        loadWallets();
-    }, []);
+    const lock = () => {
+        setDecryptedWallet(null);
+        setSessionPasscode(null);
+        setIsUnlocked(false);
+    };
 
-    const value = { accounts, loading };
+    const value = {
+        decryptedWallet,
+        isUnlocked,
+        sessionPasscode,
+        userId,
+        setUserId,
+        unlock,
+        lock,
+        accounts: decryptedWallet ? decryptedWallet.accounts : [],
+    };
 
     return (
         <WalletContext.Provider value={value}>

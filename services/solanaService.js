@@ -6,16 +6,23 @@ import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 export const fetchSolanaData = async (wallet, network) => {
     const connection = new Connection(network.rpcUrl, 'confirmed');
 
-    if (!wallet.solanaAddress) {
+    if (!wallet.solana || !wallet.solana.address) {
         console.error("Solana address not found in wallet object.");
-        return { nativeBalance: '0.00', tokenBalances: [], transactions: [] };
+        return { nativeBalance: '0.00', tokenBalances: [], transactions: [], portfolio: { totalValue: '0.00', value_change_24h: 0, percent_change_24h: 0 } };
     }
 
-    const publicKey = new PublicKey(wallet.solanaAddress);
+    const publicKey = new PublicKey(wallet.solana.address);
 
     // 1. Fetch Native Balance (SOL)
     const balanceLamports = await connection.getBalance(publicKey);
     const nativeBalance = (balanceLamports / LAMPORTS_PER_SOL).toFixed(4);
+
+    // For now, portfolio data for Solana will be minimal as we are not fetching market data yet.
+    const portfolio = {
+        totalValue: nativeBalance, // Placeholder, will be improved
+        value_change_24h: 0,
+        percent_change_24h: 0,
+    };
 
     // 2. Fetch SPL Token Balances efficiently
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
@@ -49,48 +56,56 @@ export const fetchSolanaData = async (wallet, network) => {
                 symbol: tokenMetadata.symbol,
                 balance: tokenAmount.uiAmountString,
                 decimals: tokenAmount.decimals,
+                value_usd: '0.00', // Placeholder
+                price_change_24h: 0, // Placeholder
             };
         })
     );
     
     // 3. Fetch Transaction History
-    const signatureInfos = await connection.getSignaturesForAddress(publicKey, { limit: 20 });
+    const signatureInfos = await connection.getSignaturesForAddress(publicKey, { limit: 25 });
     const transactions = await Promise.all(signatureInfos.map(async (signatureInfo) => {
-        const txDetails = await connection.getParsedTransaction(signatureInfo.signature, { maxSupportedTransactionVersion: 0 });
-        if (!txDetails || !txDetails.blockTime) return null; // Skip if details are missing
+        try {
+            const txDetails = await connection.getParsedTransaction(signatureInfo.signature, { maxSupportedTransactionVersion: 0 });
+            if (!txDetails || !txDetails.blockTime) return null;
 
-        // Determine transaction type and details
-        const { transaction, meta } = txDetails;
-        const instruction = transaction.message.instructions[0]; // Simplification: assuming one instruction
+            const { transaction, meta } = txDetails;
+            const isOut = transaction.message.accountKeys.some(key => key.signer && key.pubkey.equals(publicKey));
+            const instruction = transaction.message.instructions[0]; 
 
-        let from = 'Unknown';
-        let to = 'Unknown';
-        let value = '0';
-        let type = instruction.programId.toBase58(); // Default type
+            let from = 'Unknown';
+            let to = 'Unknown';
+            let value = '0';
 
-        if (instruction.program === 'system' && instruction.parsed?.type === 'transfer') {
-            from = instruction.parsed.info.source;
-            to = instruction.parsed.info.destination;
-            value = (instruction.parsed.info.lamports / LAMPORTS_PER_SOL).toString();
-            type = 'transfer';
+            if (instruction.program === 'system' && instruction.parsed?.type === 'transfer') {
+                from = instruction.parsed.info.source;
+                to = instruction.parsed.info.destination;
+                value = (instruction.parsed.info.lamports / LAMPORTS_PER_SOL).toString();
+            }
+
+            return {
+                hash: signatureInfo.signature,
+                from,
+                to,
+                value,
+                timeStamp: txDetails.blockTime,
+                isOut,
+                status: meta?.err ? 'failed' : 'success',
+                blockNumber: txDetails.slot,
+            };
+        } catch (error) {
+            console.error(`Failed to parse transaction ${signatureInfo.signature}:`, error);
+            return null;
         }
-
-        return {
-            hash: signatureInfo.signature,
-            from: from,
-            to: to,
-            value: value,
-            timeStamp: txDetails.blockTime,
-            status: meta?.err ? 'failed' : 'success', // Simplified status
-            blockNumber: txDetails.slot, // Using slot as a stand-in for block number
-            type: type,
-            networkId: 'solana' // Identify the network
-        };
     }));
 
     const validTransactions = transactions.filter(t => t !== null);
-
     const validTokenBalances = tokenBalances.filter(t => t !== null);
 
-    return { nativeBalance, tokenBalances: validTokenBalances, transactions: validTransactions };
+    return { 
+        nativeBalance, 
+        tokenBalances: validTokenBalances, 
+        transactions: validTransactions, 
+        portfolio 
+    };
 };

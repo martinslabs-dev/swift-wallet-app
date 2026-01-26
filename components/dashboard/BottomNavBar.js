@@ -7,25 +7,34 @@ import UsersIcon from './icons/UsersIcon';
 import CogIcon from './icons/CogIcon';
 
 const NavItem = ({ icon: Icon, label, isActive, onClick }) => {
+    // Active text will have a gradient color
+    const activeTextClass = 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 font-bold';
+    // Active icon will be solid cyan
+    const activeIconClass = 'text-cyan-400';
+    // Inactive elements will be gray
+    const inactiveClass = 'text-gray-400';
+
     return (
-        <motion.button 
-            onClick={onClick} 
-            className="flex flex-col items-center justify-center w-full h-full relative text-gray-400 focus:outline-none" 
+        <motion.button
+            onClick={onClick}
+            className="flex flex-col items-center justify-center w-full h-full relative focus:outline-none"
             whileTap={{ scale: 0.9 }}
         >
-            <Icon className={`w-6 h-6 transition-colors duration-300 ${isActive ? 'text-cyan-400' : ''}`} />
-            <span className={`text-xs mt-1 transition-colors duration-300 ${isActive ? 'text-cyan-400' : ''}`}>
+            <Icon className={`w-6 h-6 transition-colors duration-300 ${isActive ? activeIconClass : inactiveClass}`} />
+            <span className={`text-xs mt-1 transition-colors duration-300 ${isActive ? activeTextClass : inactiveClass}`}>
                 {label}
             </span>
             {isActive && (
-                <motion.div 
-                    className="absolute -top-1 w-8 h-1 bg-cyan-400 rounded-full"
-                    layoutId="active-indicator"
+                <motion.div
+                    // The active indicator will be a gradient bar at the top, matching the text
+                    className="absolute top-0 w-full h-1 bg-gradient-to-r from-cyan-400 to-blue-500"
+                    layoutId="active-indicator" // This creates the sliding animation
                 />
             )}
         </motion.button>
     );
 };
+
 
 const BottomNavBar = ({ activeTab, onTabChange }) => {
     const navItems = [

@@ -1,5 +1,6 @@
 
 import { ethers } from 'ethers';
+import { getRpcUrl } from '../utils/rpc'; // Import the new RPC utility
 import { fetchTokensForNetwork, ERC20_ABI } from '../utils/tokens';
 import { getMarketData } from './marketService';
 
@@ -9,7 +10,14 @@ export const fetchEvmData = async (wallet, network) => {
     if (!wallet || !wallet.evm || !wallet.evm.address) {
         throw new Error("EVM wallet data is missing or invalid.");
     }
-    const provider = new ethers.JsonRpcProvider(network.rpcUrl);
+
+    const rpcUrl = getRpcUrl(network.chainId);
+    if (!rpcUrl) {
+        console.error(`No RPC endpoints available for network ID: ${network.chainId}`);
+        throw new Error(`Could not connect to network ${network.name}. No RPC endpoints available.`);
+    }
+
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
 
     const balanceWei = await provider.getBalance(wallet.evm.address);
     const nativeBalance = parseFloat(ethers.formatEther(balanceWei));
@@ -78,10 +86,13 @@ export const fetchEvmData = async (wallet, network) => {
     let transactions = [];
     try {
         if (network.etherscanApiUrl) {
-            const apiKey = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY;
+            const apiKey = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY || '6261I34WBI4V53N185U215W25P264QSXPJ';
             if (apiKey) {
                 const url = `${network.etherscanApiUrl}?module=account&action=txlist&address=${wallet.evm.address}&sort=desc&apikey=${apiKey}`;
                 const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Etherscan API request failed with status ${response.status}`);
+                }
                 const data = await response.json();
                 if (data.status === "1" && Array.isArray(data.result)) {
                     transactions = data.result.map(tx => ({ 
@@ -89,6 +100,11 @@ export const fetchEvmData = async (wallet, network) => {
                         value: ethers.formatEther(tx.value),
                         isOut: tx.from.toLowerCase() === wallet.evm.address.toLowerCase(),
                     }));
+                } else if (data.status === "0" && data.message.includes("No transactions found")) {
+                    // This is not an error, just an empty history
+                    transactions = [];
+                } else if (data.message) {
+                    console.warn(`Etherscan API returned a non-success status: ${data.message}`);
                 }
             } else {
                 console.warn("Etherscan API key not found. Skipping transaction history fetch.");
@@ -96,16 +112,18 @@ export const fetchEvmData = async (wallet, network) => {
         }
     } catch (error) {
         console.error("Failed to fetch transaction history from Etherscan:", error);
+        // Don't let a failed transaction fetch block the rest of the data
+        transactions = []; // Ensure it's an array
     }
 
     return {
         nativeBalance: nativeBalance.toFixed(5),
         tokenBalances: enrichedTokenBalances,
-        transactions,
+        transactions, // Make sure transactions are returned
         portfolio: {
             totalValue: totalValueUSD.toFixed(2),
-            change24h: changePercentage.toFixed(2),
-            change24hValue: changeValue.toFixed(2),
+            value_change_24h: changeValue.toFixed(2),
+            percent_change_24h: changePercentage.toFixed(2),
         }
     };
 };

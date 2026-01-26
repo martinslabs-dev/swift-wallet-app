@@ -17,7 +17,7 @@ const AddAccountScreen = ({ onBack, onAddAccount }) => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <h2 className="text-xl font-bold">Add New Account</h2>
+                <h2 className="text-xl font-bold theme-gradient-text">Add New Account</h2>
             </div>
 
             <div className="bg-gray-800 p-4 rounded-lg">

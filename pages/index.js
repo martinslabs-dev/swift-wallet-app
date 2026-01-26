@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from 'next/router';
 import dynamic from "next/dynamic";
@@ -43,17 +42,18 @@ import TokenDetailModal from "../components/dashboard/TokenDetailModal";
 import BottomNavBar from "../components/dashboard/BottomNavBar";
 import AccountsScreen from "../components/dashboard/AccountsScreen";
 import BridgeScreen from "../components/dashboard/BridgeScreen";
+import ManageTokensScreen from "../components/dashboard/ManageTokensScreen";
 
 // --- Util & Asset Imports ---
 import { storage } from "../utils/storage";
+import { ERC20_ABI, PREDEFINED_TOKENS } from "../utils/tokens";
 import { 
     deriveWalletFromMnemonic, 
     deriveWalletFromPrivateKey, 
     createViewOnlyWallet, 
-    reconstructWallet, 
-    deriveAccount 
+    deriveAccount, 
+    reconstructWallet 
 } from "../utils/wallet";
-import { ERC20_ABI } from "../utils/tokens";
 import UsdtIcon from '../components/dashboard/icons/UsdtIcon';
 import UsdcIcon from '../components/dashboard/icons/UsdcIcon';
 
@@ -93,6 +93,7 @@ function GatewayScreen() {
     const [showSwapScreen, setShowSwapScreen] = useState(false);
     const [showConfirmScreen, setShowConfirmScreen] = useState(false);
     const [showImportTokenModal, setShowImportTokenModal] = useState(false);
+    const [showManageTokens, setShowManageTokens] = useState(false);
     const [showSeedPhrase, setShowSeedPhrase] = useState(false);
     const [showAddAccountScreen, setShowAddAccountScreen] = useState(false);
     const [showExportPrivateKeyScreen, setShowExportPrivateKeyScreen] = useState(false);
@@ -385,6 +386,29 @@ function GatewayScreen() {
         await storage.hideToken(lowerCaseAddress, activeNetwork.chainId, userId, sessionPasscode);
     };
 
+    const handleToggleTokenVisibility = async (token) => {
+        const address = token.address.toLowerCase();
+        const isHidden = hiddenTokens.includes(address);
+        let newHiddenTokens;
+
+        if (isHidden) {
+            newHiddenTokens = hiddenTokens.filter(t => t !== address);
+            // It was hidden, now we show it. We might need to add it to custom tokens if it's not a default one.
+            const isPredefined = (PREDEFINED_TOKENS[activeNetwork.chainId] || []).some(t => t.address.toLowerCase() === address);
+            if (!isPredefined) {
+                // This logic assumes `token` object is complete for storage
+                await storage.addCustomToken(token, activeNetwork.chainId, userId, sessionPasscode);
+            }
+        } else {
+            newHiddenTokens = [...hiddenTokens, address];
+        }
+
+        setHiddenTokens(newHiddenTokens);
+        // Persist the entire list of hidden tokens for simplicity
+        await storage.setHiddenTokens(newHiddenTokens, activeNetwork.chainId, userId, sessionPasscode);
+        fetchAllData(); // Refresh data to show/hide token
+    };
+
     const handleSortChange = async (newSort) => {
         if (!userId || !sessionPasscode || sessionPasscode === 'view-only') return;
         setSortPreference(newSort);
@@ -425,17 +449,10 @@ function GatewayScreen() {
     };
 
     const processedTokenBalances = useMemo(() => {
-        const visibleTokens = tokenBalances.filter(token => 
+        return tokenBalances.filter(token => 
             !hiddenTokens.includes(token.address?.toLowerCase())
         );
-
-        switch (sortPreference) {
-            case 'name_asc': return [...visibleTokens].sort((a, b) => a.name.localeCompare(b.name));
-            case 'name_desc': return [...visibleTokens].sort((a, b) => b.name.localeCompare(a.name));
-            case 'value_desc': return [...visibleTokens].sort((a, b) => parseFloat(b.value_usd) - parseFloat(a.value_usd));
-            default: return visibleTokens;
-        }
-    }, [tokenBalances, hiddenTokens, sortPreference]);
+    }, [tokenBalances, hiddenTokens]);
     
     const getDisplayAddress = () => {
         const account = decryptedWallet?.accounts[decryptedWallet.activeAccountIndex];
@@ -468,6 +485,7 @@ function GatewayScreen() {
                         onReceive={() => setShowReceiveScreen(true)}
                         onSwap={() => setShowSwapScreen(true)}
                         onImportToken={() => setShowImportTokenModal(true)}
+                        onManageTokens={() => setShowManageTokens(true)}
                         onTransactionClick={handleTransactionClick}
                         onTokenClick={handleTokenClick}
                         network={activeNetwork}
@@ -515,7 +533,7 @@ function GatewayScreen() {
             case FLOW.SHOW_BACKUP_PHRASE: return <BackupPhrase phrase={mnemonic} onContinue={() => { if (decryptedWallet) { setFlowStep(FLOW.WALLET_READY); } else { setFlowStep(FLOW.VERIFY_BACKUP_PHRASE); } }} />;
             case FLOW.VERIFY_BACKUP_PHRASE: return <VerifyPhrase phrase={mnemonic} onVerified={handlePhraseVerified} />;
             case FLOW.WALLET_READY: return <WalletReady onContinue={() => { setHasCompletedOnboarding(true); setIsUnlocked(true); }} />;
-_C_IMPORT_WALLET: return <ImportWallet onImportMnemonic={() => setFlowStep(FLOW.IMPORT_FROM_MNEMONIC)} onImportPrivateKey={() => setFlowStep(FLOW.IMPORT_FROM_PRIVATE_KEY)} onViewOnly={() => setFlowStep(FLOW.ADD_VIEW_ONLY_WALLET)} onBack={() => setFlowStep(FLOW.ONBOARDING)} />;
+            case FLOW.IMPORT_WALLET: return <ImportWallet onImportMnemonic={() => setFlowStep(FLOW.IMPORT_FROM_MNEMONIC)} onImportPrivateKey={() => setFlowStep(FLOW.IMPORT_FROM_PRIVATE_KEY)} onViewOnly={() => setFlowStep(FLOW.ADD_VIEW_ONLY_WALLET)} onBack={() => setFlowStep(FLOW.ONBOARDING)} />;
             case FLOW.IMPORT_FROM_MNEMONIC: return <ImportFromMnemonic onMnemonicSubmit={handleMnemonicImportSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
             case FLOW.IMPORT_FROM_PRIVATE_KEY: return <ImportFromPrivateKey onPrivateKeySubmit={handlePrivateKeyImportSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
             case FLOW.ADD_VIEW_ONLY_WALLET: return <AddViewOnlyWallet onAddressSubmit={handleViewOnlyAddressSubmit} onBack={() => setFlowStep(FLOW.IMPORT_WALLET)} />;
@@ -529,6 +547,18 @@ _C_IMPORT_WALLET: return <ImportWallet onImportMnemonic={() => setFlowStep(FLOW.
                 <AnimatePresence mode="wait">{renderContent()}</AnimatePresence>
             </main>
             <AnimatePresence>
+                {showManageTokens && (
+                    <ManageTokensScreen
+                        onClose={() => setShowManageTokens(false)}
+                        onImportToken={() => {
+                            setShowManageTokens(false);
+                            setShowImportTokenModal(true);
+                        }}
+                        visibleTokens={processedTokenBalances}
+                        onToggleToken={handleToggleTokenVisibility}
+                        network={activeNetwork}
+                    />
+                )}
                 {showReceiveScreen && decryptedWallet && <ReceiveScreen wallet={{ address: getDisplayAddress() }} onClose={() => setShowReceiveScreen(false)} />}
                 {showSendScreen && decryptedWallet && !isViewOnly && <SendScreen userId={userId} sessionPasscode={sessionPasscode} onClose={() => setShowSendScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSendScreen(false); setShowConfirmScreen(true); }} ethBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} activeAccount={activeAccount}/>}
                 {showSwapScreen && !isViewOnly && <SwapScreen onClose={() => setShowSwapScreen(false)} onConfirm={(d) => { setTransactionDetails(d); setShowSwapScreen(false); setShowConfirmScreen(true); }} nativeBalance={nativeBalance} tokenBalances={tokenBalances} icons={tokenIcons} network={activeNetwork} />}

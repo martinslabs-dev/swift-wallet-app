@@ -1,150 +1,201 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { relayService } from '../../services/relayService';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import Select from 'react-select';
+import { FiArrowRight } from 'react-icons/fi';
+import debounce from 'lodash.debounce';
+
+import { lifiService } from '../../services/lifiService';
 import { useNetwork } from '../../context/NetworkContext';
+import { parseUnits, formatUnits } from "ethers";
 
-// --- Reusable UI Components (omitted for brevity) ---
-const TabButton = ({ label, active, onClick }) => (
-    <button 
-        onClick={onClick}
-        className={`px-4 py-2 text-sm font-medium transition-colors relative ` + 
-                   `${active ? 'text-white' : 'text-gray-400 hover:text-white'}`}
-    >
-        {label}
-        {active && <motion.div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" layoutId="bridge-active-tab" />}
-    </button>
-);
 const Spinner = () => <div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin"></div>;
-const MOCK_TOKENS = { /* ... */ };
 
-// --- Bridge Feature Placeholder ---
-const BridgeView = () => <div className="p-4 text-center">Bridge feature from previous step.</div>;
-
-// --- Cross-Chain Swap Feature (with bug fix) ---
-const CrossChainSwapView = () => {
-    const { networks, activeNetwork } = useNetwork();
+const CrossChainSwapView = ({ activeAccount, onConfirm }) => {
+    const { networks } = useNetwork();
     
-    // State
-    const [amount, setAmount] = useState('');
-    const [quote, setQuote] = useState(null);
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [lifiChains, setLifiChains] = useState([]);
+    const [fromTokens, setFromTokens] = useState([]);
+    const [toTokens, setToTokens] = useState([]);
 
     const [fromChain, setFromChain] = useState(null);
     const [toChain, setToChain] = useState(null);
     const [fromToken, setFromToken] = useState(null);
     const [toToken, setToToken] = useState(null);
+    const [fromAmount, setFromAmount] = useState('');
+    const [toAmount, setToAmount] = useState('');
 
-    // Effect to safely set default chains and tokens when network data is available
-    useEffect(() => {
-        if (activeNetwork && networks && networks.length > 0) {
-            setFromChain(activeNetwork);
-
-            const initialToChain = networks.find(n => n.chainId !== activeNetwork.chainId) || networks[0];
-            setToChain(initialToChain);
-
-            const fromTokens = MOCK_TOKENS[activeNetwork.chainId] || [];
-            const toTokens = MOCK_TOKENS[initialToChain.chainId] || [];
-            setFromToken(fromTokens[0]);
-            setToToken(toTokens[0]);
-        }
-    }, [activeNetwork, networks]);
-
-    // Handlers (handleGetQuote, etc. - omitted for brevity)
-    const handleGetQuote = async () => { /* ... */ };
-
-    // Guard clause to prevent rendering with incomplete data
-    if (!fromChain || !toChain || !fromToken || !toToken) {
-        return <div className="p-4 text-center text-gray-400">Initializing...</div>;
-    }
-
-    const availableFromTokens = MOCK_TOKENS[fromChain.chainId] || [];
-    const availableToTokens = MOCK_TOKENS[toChain.chainId] || [];
-
-    return (
-        <div className="p-4 flex flex-col gap-4"> 
-            {/* ... JSX for form elements, using fromChain, toChain etc. ... */}
-            <p className='text-center'>Cross-Chain Swap View</p>
-        </div>
-    );
-};
-
-
-// --- Cross-Chain Pay Feature (with bug fix) ---
-const PayView = () => {
-    const { networks, activeNetwork } = useNetwork();
-
-    // State
-    const [isLoading, setIsLoading] = useState(false);
+    const [isFetchingQuote, setIsFetchingQuote] = useState(false);
+    const [quote, setQuote] = useState(null);
     const [error, setError] = useState('');
-    const [toChain, setToChain] = useState(null);
-    const [targetAddress, setTargetAddress] = useState('');
-    const [amount, setAmount] = useState('0');
-    const [calldata, setCalldata] = useState('');
 
-    // Effect to safely set default destination chain
     useEffect(() => {
-        if (activeNetwork && networks && networks.length > 0) {
-            const possibleDestinations = networks.filter(n => n.chainId !== activeNetwork.chainId);
-            if (possibleDestinations.length > 0) {
-                setToChain(possibleDestinations[0]);
+        const fetchChains = async () => {
+            try {
+                const chains = await lifiService.getChains();
+                const supportedChains = chains.map(c => ({ value: c.id, label: c.name, ...c }));
+                setLifiChains(supportedChains);
+
+                const activeChainId = networks.find(n => n.name.toLowerCase() === activeAccount.network.toLowerCase())?.chainId;
+                const activeLifiChain = supportedChains.find(c => c.id === activeChainId);
+                
+                if (activeLifiChain) {
+                    setFromChain(activeLifiChain);
+                    const defaultToChain = supportedChains.find(c => c.id !== activeChainId);
+                    if (defaultToChain) setToChain(defaultToChain);
+                }
+
+            } catch (err) {
+                setError('Could not load supported chains.');
             }
+        };
+        if(activeAccount) fetchChains();
+    }, [activeAccount, networks]);
+
+    useEffect(() => {
+        const fetchTokensForChain = async (chain, setTokensCallback, setTokenCallback) => {
+            if (!chain) return;
+            try {
+                const tokensResponse = await lifiService.getTokens([chain.value]);
+                const tokensForChain = tokensResponse[chain.value] || [];
+                const formattedTokens = tokensForChain.map(t => ({ value: t.address, label: `${t.name} (${t.symbol})`, ...t }));
+                setTokensCallback(formattedTokens);
+
+                const nativeToken = formattedTokens.find(t => t.address.toLowerCase() === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
+                if (nativeToken) {
+                    setTokenCallback(nativeToken);
+                } else if (formattedTokens.length > 0) {
+                    setTokenCallback(formattedTokens[0]);
+                }
+
+            } catch (err) {
+                setError(`Could not load tokens for ${chain.label}.`);
+                setTokensCallback([]);
+            }
+        };
+
+        if (fromChain) {
+            fetchTokensForChain(fromChain, setFromTokens, setFromToken);
         }
-    }, [activeNetwork, networks]);
+        if (toChain) {
+            fetchTokensForChain(toChain, setToTokens, setToToken);
+        }
+    }, [fromChain, toChain]);
 
-    const handleCreatePayTransaction = async () => { /* ... */ };
+    const getSwapQuote = async (amount) => {
+        if (!fromChain || !toChain || !fromToken || !toToken || !amount || !activeAccount) return;
+        setIsFetchingQuote(true);
+        setError('');
+        setQuote(null);
 
-    // Guard clause to prevent rendering if no destination is possible
-    if (!activeNetwork || !networks || networks.filter(n => n.chainId !== activeNetwork.chainId).length === 0) {
-        return <div className="p-4 text-center text-gray-400">A destination network is required for this feature.</div>;
-    }
+        try {
+            const amountInSmallestUnit = parseUnits(amount, fromToken.decimals).toString();
+            const params = {
+                fromChain: fromChain.value,
+                toChain: toChain.value,
+                fromToken: fromToken.value,
+                toToken: toToken.value,
+                fromAmount: amountInSmallestUnit,
+                fromAddress: activeAccount.address, // Assuming EVM address
+            };
+            const result = await lifiService.getQuote(params);
+            setQuote(result);
+            if(result.estimate.toAmount) {
+                setToAmount(formatUnits(result.estimate.toAmount, result.action.toToken.decimals));
+            }
+        } catch (err) {
+            setError(err.message || 'Could not fetch quote.');
+            setToAmount('');
+        } finally {
+            setIsFetchingQuote(false);
+        }
+    };
+
+    const debouncedGetQuote = useCallback(debounce(getSwapQuote, 800), [fromChain, toChain, fromToken, toToken, activeAccount]);
+
+    useEffect(() => {
+        debouncedGetQuote(fromAmount);
+        return () => debouncedGetQuote.cancel();
+    }, [fromAmount, debouncedGetQuote]);
+
+    const handleBridge = () => {
+        if (!quote || !quote.transactionRequest) return;
+        onConfirm({ ...quote, isBridge: true });
+    };
     
-    // Guard clause for when the default is being set
-    if (!toChain) {
-         return <div className="p-4 text-center text-gray-400">Initializing...</div>;
+    const handleAmountChange = (e) => {
+        const value = e.target.value;
+        if (/^\d*\.?\d*$/.test(value)) {
+            setFromAmount(value);
+        }
     }
 
     return (
         <div className="p-4 flex flex-col gap-4 text-sm">
-            <p className="text-xs text-center text-gray-400">Execute a cross-chain contract call. For advanced users.</p>
-            <div className="flex flex-col gap-1">
-                <label className="text-gray-300">Destination Chain</label>
-                <select value={toChain.chainId} onChange={e => setToChain(networks.find(n => n.chainId === e.target.value))} className="bg-gray-800 border border-gray-700 rounded-md p-2 focus:outline-none w-full">
-                    {networks.filter(n => n.chainId !== activeNetwork.chainId).map(n => <option key={n.chainId} value={n.chainId}>{n.name}</option>)}
-                </select>
+            <div className="grid grid-cols-5 items-center gap-2">
+                <div className="col-span-2">
+                    <label className="text-gray-300 mb-1 block">From</label>
+                    <Select options={lifiChains} value={fromChain} onChange={setFromChain} />
+                </div>
+                <div className="col-span-1 text-center pt-6"><FiArrowRight size={20} className="mx-auto"/></div>
+                <div className="col-span-2">
+                    <label className="text-gray-300 mb-1 block">To</label>
+                    <Select options={lifiChains} value={toChain} onChange={setToChain} />
+                </div>
             </div>
-            {/* ... other form elements ... */}
+
+            <div className="bg-gray-800 p-3 rounded-lg">
+                <label className="text-gray-300 text-xs">You Send</label>
+                <div className="flex items-center gap-2 mt-1">
+                    <div className="w-2/5">
+                        <Select options={fromTokens} value={fromToken} onChange={setFromToken} />
+                    </div>
+                    <input type="text" value={fromAmount} onChange={handleAmountChange} placeholder="0.0" className="bg-gray-900 border border-gray-700 rounded-md p-2 w-3/5 text-right text-lg"/>
+                </div>
+            </div>
+
+            <div className="bg-gray-800 p-3 rounded-lg">
+                <label className="text-gray-300 text-xs">You Receive (Estimated)</label>
+                 <div className="flex items-center gap-2 mt-1">
+                    <div className="w-2/5">
+                        <Select options={toTokens} value={toToken} onChange={setToToken} />
+                    </div>
+                    <input type="text" value={toAmount} readOnly placeholder="0.0" className="bg-gray-900 border border-gray-700 rounded-md p-2 w-3/5 text-right text-lg"/>
+                </div>
+            </div>
+
+            {error && <p className="text-red-400 text-xs text-center p-2 bg-red-900/50 rounded-md">{error}</p>}
+            
+            {quote && quote.estimate && (
+                 <div className="text-xs text-gray-400 bg-gray-800/50 p-3 rounded-md space-y-1">
+                    <div className="flex justify-between"><span>Gas Cost:</span> <span>~${quote.estimate.gasCosts[0].amountUSD}</span></div>
+                    <div className="flex justify-between"><span>Est. Time:</span> <span>{Math.round(quote.estimate.executionDuration / 60)} min</span></div>
+                    {quote.toolDetails && <div className="flex justify-between"><span>Provider:</span> <span className="capitalize">{quote.toolDetails.name}</span></div>}
+                 </div>
+            )}
+
+            <button onClick={handleBridge} disabled={!quote || isFetchingQuote || !fromAmount} className="w-full bg-cyan-500 text-white font-bold py-3 px-4 rounded-md disabled:bg-gray-700 disabled:text-gray-400 flex justify-center items-center transition-all">
+                {isFetchingQuote ? <Spinner /> : 'Review Bridge'}
+            </button>
         </div>
     );
 };
 
-
-// --- Main Screen Component ---
-const BridgeScreen = () => {
-    const [activeTab, setActiveTab] = useState('bridge');
-
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'bridge': return <BridgeView />;
-            case 'cross_chain_swap': return <CrossChainSwapView />;
-            case 'pay': return <PayView />;
-            default: return null;
-        }
-    };
+const BridgeScreen = ({ activeAccount, onConfirm }) => {
+    if (!activeAccount) {
+        return <div className="p-8 text-center text-gray-400">Please select an active account to begin.</div>
+    }
 
     return (
         <div className="w-full max-w-md mx-auto h-full flex flex-col bg-gray-900/50 rounded-lg overflow-hidden">
-            <div className="flex justify-center border-b border-gray-700/50">
-                <TabButton label="Bridge" active={activeTab === 'bridge'} onClick={() => setActiveTab('bridge')} />
-                <TabButton label="Cross-Chain Swap" active={activeTab === 'cross_chain_swap'} onClick={() => setActiveTab('cross_chain_swap')} />
-                <TabButton label="Pay" active={activeTab === 'pay'} onClick={() => setActiveTab('pay')} />
+            <div className="p-4 border-b border-gray-700/50">
+                <h2 className="text-xl font-bold text-center">Bridge & Swap</h2>
             </div>
-            <div className="flex-grow">
-                <AnimatePresence mode="wait">
-                    <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-                        {renderContent()}
-                    </motion.div>
-                </AnimatePresence>
+            <div className="flex-grow overflow-y-auto">
+                <CrossChainSwapView 
+                    activeAccount={activeAccount}
+                    onConfirm={onConfirm}
+                />
             </div>
         </div>
     );
